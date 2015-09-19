@@ -7,7 +7,7 @@ import "unicode"
 import "mapreduce"
 import "strconv"
 import "container/list"
-
+	
 // our simplified version of MapReduce does not supply a
 // key to the Map function, as in the paper; only a value,
 // which is a part of the input file content. the return
@@ -15,10 +15,14 @@ import "container/list"
 // by a mapreduce.KeyValue.
 func Map(value string) *list.List {
 	result := list.New()
-	f := func(c rune) bool {
+	// Function that returns a bool if the current token is alpha.
+	// This is used by the FieldsFunc in the Map function to split
+	// the words.
+	tokenizer := func(c rune) bool {
 		return !unicode.IsLetter(c)
 	}
-	tokens := strings.FieldsFunc(value, f)
+
+	tokens := strings.FieldsFunc(value, tokenizer)
 	for _ ,token := range tokens {
 		result.PushBack(mapreduce.KeyValue{token, "1"})
 		//fmt.Println(_ , token)
