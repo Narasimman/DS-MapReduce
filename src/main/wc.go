@@ -18,14 +18,13 @@ func Map(value string) *list.List {
 	// Function that returns a bool if the current token is alpha.
 	// This is used by the FieldsFunc in the Map function to split
 	// the words.
-	tokenizer := func(c rune) bool {
+	isValidLiteral := func(c rune) bool {
 		return !unicode.IsLetter(c)
 	}
 
-	tokens := strings.FieldsFunc(value, tokenizer)
+	tokens := strings.FieldsFunc(value, isValidLiteral)
 	for _ ,token := range tokens {
 		result.PushBack(mapreduce.KeyValue{token, "1"})
-		//fmt.Println(_ , token)
 	}
 	return result
 }
