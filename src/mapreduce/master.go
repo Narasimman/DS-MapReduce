@@ -34,23 +34,22 @@ func (mr *MapReduce) KillWorkers() *list.List {
 // 
 func (mr *MapReduce) RunMaster() *list.List {
 	mapchannel, reducechannel := make(chan int, mr.nMap), make(chan int, mr.nReduce)
-	
+
 	makeRPCcall := func (worker string, id int, operation JobType) bool {
 		var jobArgs DoJobArgs
 		var replyArgs DoJobReply
 		jobArgs.File = mr.file
 		jobArgs.Operation = operation
 		jobArgs.JobNumber = id
-		
+
 		if operation == Map {
 			jobArgs.NumOtherPhase = mr.nReduce	
-		} else {
+		} else { // Reduce
 			jobArgs.NumOtherPhase = mr.nMap
-		}	
-		
+		}
 		return call(worker, "Worker.DoJob", jobArgs, &replyArgs)
 	}
-	
+
 	for i := 0; i < mr.nMap ; i++ {
 		go func(index int) {
 			for {
@@ -58,9 +57,9 @@ func (mr *MapReduce) RunMaster() *list.List {
 				ok := false
 				select {
 					case worker = <- mr.freePoolChannel:
-						DPrintf("Worker from free pool")
+						DPrintf("Map - Worker from free pool\n")
 					case worker = <- mr.registerChannel:
-						DPrintf("Worker from Registered")						
+						DPrintf("Map - Worker from Registered pool\n")						
 				}
 				ok = makeRPCcall(worker, index, Map)
 				
@@ -69,18 +68,18 @@ func (mr *MapReduce) RunMaster() *list.List {
 					mr.freePoolChannel <- worker
 					return
 				}
-			}
+			} // for
 			
 		}(i)
 	}
 	
+	// dump all map channel indices
 	for i :=0; i < mr.nMap ; i++ {
-		fmt.Println("Waiting %d" , i)
 		<- mapchannel
-		fmt.Println("Done %d", i)
 	}
 	
-	DPrintf("Map process done!")
+	close(mapchannel)
+	DPrintf("Map process done!\n")
 	
 	// Start reduce process
 	for i := 0; i < mr.nReduce ; i++ {
@@ -89,9 +88,9 @@ func (mr *MapReduce) RunMaster() *list.List {
 			ok := false
 			select {
 				case worker = <- mr.freePoolChannel:
-					fmt.Println("Idle")
+					DPrintf("Reduce - Worker from free pool\n")
 				case worker = <- mr.registerChannel:
-					fmt.Println("Register")
+					DPrintf("Reduce - Worker from registration pool\n")
 			}
 			
 			ok = makeRPCcall(worker, index, Reduce)
@@ -105,10 +104,13 @@ func (mr *MapReduce) RunMaster() *list.List {
 		}(i)
 	}
 	
+	// dump all reduce channel indices
 	for i :=0; i < mr.nReduce ; i++ {
 		<- reducechannel
 	}
-	DPrintf("Redeuce process done!")
+	
+	close(reducechannel)
+	DPrintf("Reduce process done!\n")
 	
 	return mr.KillWorkers()
 }
