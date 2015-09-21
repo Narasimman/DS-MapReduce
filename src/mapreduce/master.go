@@ -84,23 +84,24 @@ func (mr *MapReduce) RunMaster() *list.List {
 	// Start reduce process
 	for i := 0; i < mr.nReduce ; i++ {
 		go func(index int) {
-			var worker string
-			ok := false
-			select {
-				case worker = <- mr.freePoolChannel:
-					DPrintf("Reduce - Worker from free pool\n")
-				case worker = <- mr.registerChannel:
-					DPrintf("Reduce - Worker from registration pool\n")
+			for {
+				var worker string
+				ok := false
+				select {
+					case worker = <- mr.freePoolChannel:
+						DPrintf("Reduce - Worker from free pool\n")
+					case worker = <- mr.registerChannel:
+						DPrintf("Reduce - Worker from registration pool\n")
+				}
+				
+				ok = makeRPCcall(worker, index, Reduce)
+				
+				if(ok) {
+					reducechannel <- index
+					mr.freePoolChannel <- worker
+					return
+				}
 			}
-			
-			ok = makeRPCcall(worker, index, Reduce)
-			
-			if(ok) {
-				reducechannel <- index
-				mr.freePoolChannel <- worker
-				return
-			}
-			
 		}(i)
 	}
 	
