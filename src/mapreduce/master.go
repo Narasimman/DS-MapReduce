@@ -68,7 +68,6 @@ func (mr *MapReduce) RunMaster() *list.List {
 					return
 				}
 			} // for
-
 		}(i)
 	}
 
@@ -76,7 +75,6 @@ func (mr *MapReduce) RunMaster() *list.List {
 	for i :=0; i < mr.nMap ; i++ {
 		<- mapchannel
 	}
-
 	close(mapchannel)
 	DPrintf("Map process done!\n")
 
@@ -96,6 +94,7 @@ func (mr *MapReduce) RunMaster() *list.List {
 				ok = makeRPCcall(worker, index, Reduce)
 
 				if ok {
+				ok = makeRPCcall(worker, index, Reduce)
 					reducechannel <- index
 					mr.freePoolChannel <- worker
 					return
