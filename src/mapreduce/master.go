@@ -31,7 +31,6 @@ func (mr *MapReduce) KillWorkers() *list.List {
 // Delegete jobs to workers for map.
 // After Map is done, delegate jobs to workers for reduce operation.
 // This also handles worker failures.
-// 
 func (mr *MapReduce) RunMaster() *list.List {
 	mapchannel, reducechannel := make(chan int, mr.nMap), make(chan int, mr.nReduce)
 
@@ -43,7 +42,7 @@ func (mr *MapReduce) RunMaster() *list.List {
 		jobArgs.JobNumber = id
 
 		if operation == Map {
-			jobArgs.NumOtherPhase = mr.nReduce	
+			jobArgs.NumOtherPhase = mr.nReduce
 		} else { // Reduce
 			jobArgs.NumOtherPhase = mr.nMap
 		}
@@ -59,28 +58,28 @@ func (mr *MapReduce) RunMaster() *list.List {
 					case worker = <- mr.freePoolChannel:
 						DPrintf("Map - Worker from free pool\n")
 					case worker = <- mr.registerChannel:
-						DPrintf("Map - Worker from Registered pool\n")						
+						DPrintf("Map - Worker from Registered pool\n")
 				}
 				ok = makeRPCcall(worker, index, Map)
-				
-				if(ok) {
+
+				if ok {
 					mapchannel <- index
 					mr.freePoolChannel <- worker
 					return
 				}
 			} // for
-			
+
 		}(i)
 	}
-	
+
 	// dump all map channel indices
 	for i :=0; i < mr.nMap ; i++ {
 		<- mapchannel
 	}
-	
+
 	close(mapchannel)
 	DPrintf("Map process done!\n")
-	
+
 	// Start reduce process
 	for i := 0; i < mr.nReduce ; i++ {
 		go func(index int) {
@@ -93,10 +92,10 @@ func (mr *MapReduce) RunMaster() *list.List {
 					case worker = <- mr.registerChannel:
 						DPrintf("Reduce - Worker from registration pool\n")
 				}
-				
+
 				ok = makeRPCcall(worker, index, Reduce)
-				
-				if(ok) {
+
+				if ok {
 					reducechannel <- index
 					mr.freePoolChannel <- worker
 					return
@@ -104,14 +103,14 @@ func (mr *MapReduce) RunMaster() *list.List {
 			}
 		}(i)
 	}
-	
+
 	// dump all reduce channel indices
 	for i :=0; i < mr.nReduce ; i++ {
 		<- reducechannel
 	}
-	
+
 	close(reducechannel)
 	DPrintf("Reduce process done!\n")
-	
+
 	return mr.KillWorkers()
 }
