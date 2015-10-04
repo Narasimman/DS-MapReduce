@@ -18,6 +18,7 @@ type ViewServer struct {
 
 
 	// Your declarations here.
+	view View
 }
 
 //
@@ -26,7 +27,13 @@ type ViewServer struct {
 func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 
 	// Your code here.
+	viewnumber := args.Viewnum
 
+	DPrintf("Server: ", args.Viewnum)
+
+	vs.view.Primary = args.Me
+	vs.view.Viewnum = viewnumber + 1
+	reply.View = vs.view
 	return nil
 }
 
@@ -36,6 +43,7 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 func (vs *ViewServer) Get(args *GetArgs, reply *GetReply) error {
 
 	// Your code here.
+	reply.View = vs.view
 
 	return nil
 }

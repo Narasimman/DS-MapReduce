@@ -1,6 +1,7 @@
 package viewservice
 
 import "time"
+import "fmt"
 
 //
 // This is a non-replicated view service for a simple
@@ -78,3 +79,14 @@ type GetArgs struct {
 type GetReply struct {
 	View View
 }
+
+// Debugging
+const Debug = 1
+
+func DPrintf(a ...interface{}) (n int, err error) {
+	if Debug > 0 {
+		n, err = fmt.Println(a...)
+	}
+	return
+}
+
