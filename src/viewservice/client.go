@@ -60,6 +60,7 @@ func (ck *Clerk) Ping(viewnum uint) (View, error) {
 	args.Viewnum = viewnum
 	var reply PingReply
 
+	DPrintf("client : " ,  viewnum)
 	// send an RPC request, wait for the reply.
 	ok := call(ck.server, "ViewServer.Ping", args, &reply)
 	if ok == false {
