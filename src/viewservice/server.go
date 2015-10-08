@@ -16,7 +16,6 @@ type ViewServer struct {
 	rpccount int32 // for testing
 	me       string
 
-
 	// Your declarations here.
 	view View
 }
@@ -27,13 +26,14 @@ type ViewServer struct {
 func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 
 	// Your code here.
-	viewnumber := args.Viewnum
 
 	DPrintf("Server: ", args.Viewnum)
-
+	vs.mu.Lock()
+	viewnumber := args.Viewnum
 	vs.view.Primary = args.Me
 	vs.view.Viewnum = viewnumber + 1
 	reply.View = vs.view
+	vs.mu.Unlock()
 	return nil
 }
 
@@ -43,11 +43,11 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 func (vs *ViewServer) Get(args *GetArgs, reply *GetReply) error {
 
 	// Your code here.
+	vs.mu.Lock()
 	reply.View = vs.view
-
+	vs.mu.Unlock()
 	return nil
 }
-
 
 //
 // tick() is called once per PingInterval; it should notice
