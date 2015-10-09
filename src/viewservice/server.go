@@ -17,7 +17,20 @@ type ViewServer struct {
 	me       string
 
 	// Your declarations here.
-	view View
+	currentview View
+	ack bool
+}
+
+func (vs *ViewServer) updateView(primary string, backup string) bool {
+	if vs.ack && (vs.currentview.Primary != primary || vs.currentview.Backup != backup) {
+		vs.currentview.Primary = primary
+		vs.currentview.Backup = backup
+		vs.currentview.Viewnum++;
+		vs.ack = false
+		return true
+	}
+
+	return false
 }
 
 //
@@ -30,9 +43,14 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 	DPrintf("Server: ", args.Viewnum)
 	vs.mu.Lock()
 	viewnumber := args.Viewnum
-	vs.view.Primary = args.Me
-	vs.view.Viewnum = viewnumber + 1
-	reply.View = vs.view
+
+	// Very first View Point as the view number is 0
+	if args.Viewnum == 0 {
+		vs.updateView(args.Me, "")
+	} else {
+		DPrintf("Getting into else case")
+	}
+	reply.View = vs.currentview
 	vs.mu.Unlock()
 	return nil
 }
@@ -44,7 +62,7 @@ func (vs *ViewServer) Get(args *GetArgs, reply *GetReply) error {
 
 	// Your code here.
 	vs.mu.Lock()
-	reply.View = vs.view
+	reply.View = vs.currentview
 	vs.mu.Unlock()
 	return nil
 }
