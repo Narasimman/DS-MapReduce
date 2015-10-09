@@ -22,7 +22,8 @@ type ViewServer struct {
 }
 
 func (vs *ViewServer) updateView(primary string, backup string) bool {
-	if vs.ack && (vs.currentview.Primary != primary || vs.currentview.Backup != backup) {
+	if (vs.currentview.Primary != primary || vs.currentview.Backup != backup) {
+		DPrintf("Updating view")
 		vs.currentview.Primary = primary
 		vs.currentview.Backup = backup
 		vs.currentview.Viewnum++;
@@ -45,7 +46,7 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 	viewnumber := args.Viewnum
 
 	// Very first View Point as the view number is 0
-	if args.Viewnum == 0 {
+	if viewnumber == 0 {
 		vs.updateView(args.Me, "")
 	} else {
 		DPrintf("Getting into else case")
