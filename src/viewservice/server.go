@@ -40,6 +40,7 @@ func (vs *ViewServer) updateView(primary string, backup string) bool {
 func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 
 	// Your code here.
+	viewnumber := args.Viewnum
 
 	DPrintf("Server: ", args.Viewnum)
 	vs.mu.Lock()
