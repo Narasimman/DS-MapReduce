@@ -22,7 +22,7 @@ type ViewServer struct {
 }
 
 func (vs *ViewServer) updateView(primary string, backup string) bool {
-	if (vs.currentview.Primary != primary || vs.currentview.Backup != backup) {
+	if vs.ack && (vs.currentview.Primary != primary || vs.currentview.Backup != backup) {
 		DPrintf("Updating view")
 		vs.currentview.Primary = primary
 		vs.currentview.Backup = backup
@@ -40,7 +40,6 @@ func (vs *ViewServer) updateView(primary string, backup string) bool {
 func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 
 	// Your code here.
-	viewnumber := args.Viewnum
 
 	DPrintf("Server: ", args.Viewnum)
 	vs.mu.Lock()
@@ -48,9 +47,16 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 
 	// Very first View Point as the view number is 0
 	if viewnumber == 0 {
+		DPrintf("inside first view")
 		vs.updateView(args.Me, "")
 	} else {
 		DPrintf("Getting into else case")
+	}
+
+	if !vs.ack {
+		if vs.currentview.Primary == args.Me && vs.currentview.Viewnum == viewnumber {
+			vs.ack = true
+		}
 	}
 	reply.View = vs.currentview
 	vs.mu.Unlock()
@@ -105,6 +111,7 @@ func StartServer(me string) *ViewServer {
 	vs := new(ViewServer)
 	vs.me = me
 	// Your vs.* initializations here.
+	vs.ack = true
 
 	// tell net/rpc about our RPC server and handlers.
 	rpcs := rpc.NewServer()
