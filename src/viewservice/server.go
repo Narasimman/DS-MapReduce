@@ -27,12 +27,28 @@ func (vs *ViewServer) updateView(primary string, backup string) bool {
 		DPrintf("Updating view")
 		vs.currentview.Primary = primary
 		vs.currentview.Backup = backup
-		vs.currentview.Viewnum++;
+		vs.setNextViewNumber()
 		vs.ack = false
 		return true
 	}
 
 	return false
+}
+
+func (vs *ViewServer) setNextViewNumber() {
+	if vs.currentview.Viewnum == ^uint(0) {
+		vs.currentview.Viewnum = 0
+	} else {
+		vs.currentview.Viewnum++;
+	}
+}
+
+func (vs *ViewServer) promoteBackup() {
+	vs.updateView(vs.currentview.Backup, vs.getNewServerForBackup())
+}
+
+func (vs *ViewServer) assignBackup() {
+	vs.updateView(vs.currentview.Primary, vs.getNewServerForBackup())
 }
 
 func (vs *ViewServer) getNewServerForBackup() string {
@@ -64,10 +80,10 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 			vs.updateView(args.Me, "")
 		} else if vs.currentview.Primary == args.Me {
 			DPrintf("primary has just restarted. So, promote backup as the primary");
-			vs.updateView(vs.currentview.Backup, vs.getNewServerForBackup())
+			vs.promoteBackup()
 		} else if vs.currentview.Backup == args.Me {
 			DPrintf("Backup is just restarted. So, get a new backup server")
-			vs.updateView(vs.currentview.Primary, vs.getNewServerForBackup())
+			vs.assignBackup()
 		}
 	} else {
 		DPrintf("Getting into else case")
@@ -110,19 +126,21 @@ func (vs *ViewServer) tick() {
 	if vs.ack {
 		for key, value := range vs.serversPingTime {
 			if time.Since(value) > DeadPings * PingInterval {
+				delete(vs.serversPingTime, key)
 				if key == vs.currentview.Primary {
-					vs.updateView(vs.currentview.Backup, vs.getNewServerForBackup())
+					DPrintf("Primary is dead!")
+					vs.promoteBackup()
 				} else if key == vs.currentview.Backup {
-					vs.updateView(vs.currentview.Primary, vs.getNewServerForBackup())
+					DPrintf("Backup is dead!")
+					vs.assignBackup()
 				}
 			}
 		}
 
-
 		if vs.currentview.Primary == "" {
-			vs.updateView(vs.currentview.Backup, vs.getNewServerForBackup())
+			vs.promoteBackup()
 		} else if vs.currentview.Backup == "" {
-			vs.updateView(vs.currentview.Primary, vs.getNewServerForBackup())
+			vs.assignBackup()
 		}
 
 	}
