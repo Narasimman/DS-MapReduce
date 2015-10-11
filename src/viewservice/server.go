@@ -18,6 +18,7 @@ type ViewServer struct {
 
 	// Your declarations here.
 	currentview View
+	serversPingTime map[string]time.Time
 	ack bool
 }
 
@@ -34,6 +35,16 @@ func (vs *ViewServer) updateView(primary string, backup string) bool {
 	return false
 }
 
+func (vs *ViewServer) getNewServerForBackup() string {
+	for key, _ := range vs.serversPingTime {
+		//Return the server that is neither primary/backup
+		if vs.currentview.Primary != key && vs.currentview.Backup != key {
+			return key
+		}
+	}
+	return ""
+}
+
 //
 // server Ping RPC handler.
 //
@@ -43,12 +54,21 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 
 	DPrintf("Server: ", args.Viewnum)
 	vs.mu.Lock()
+	vs.serversPingTime[args.Me] = time.Now()
 	viewnumber := args.Viewnum
 
 	// Very first View Point as the view number is 0
 	if viewnumber == 0 {
-		DPrintf("inside first view")
-		vs.updateView(args.Me, "")
+		if vs.currentview.Primary == "" && vs.currentview.Backup == "" {
+ 			DPrintf("inside first view")
+			vs.updateView(args.Me, "")
+		} else if vs.currentview.Primary == args.Me {
+			DPrintf("primary has just restarted. So, promote backup as the primary");
+			vs.updateView(vs.currentview.Backup, vs.getNewServerForBackup())
+		} else if vs.currentview.Backup == args.Me {
+			DPrintf("Backup is just restarted. So, get a new backup server")
+			vs.updateView(vs.currentview.Primary, vs.getNewServerForBackup())
+		}
 	} else {
 		DPrintf("Getting into else case")
 	}
@@ -58,6 +78,7 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 			vs.ack = true
 		}
 	}
+
 	reply.View = vs.currentview
 	vs.mu.Unlock()
 	return nil
@@ -83,6 +104,31 @@ func (vs *ViewServer) Get(args *GetArgs, reply *GetReply) error {
 func (vs *ViewServer) tick() {
 
 	// Your code here.
+	vs.mu.Lock()
+	defer vs.mu.Unlock()
+
+	if vs.ack {
+		for key, value := range vs.serversPingTime {
+			if time.Since(value) > DeadPings * PingInterval {
+				if key == vs.currentview.Primary {
+					vs.updateView(vs.currentview.Backup, vs.getNewServerForBackup())
+				} else if key == vs.currentview.Backup {
+					vs.updateView(vs.currentview.Primary, vs.getNewServerForBackup())
+				}
+			}
+		}
+
+
+		if vs.currentview.Primary == "" {
+			vs.updateView(vs.currentview.Backup, vs.getNewServerForBackup())
+		} else if vs.currentview.Backup == "" {
+			vs.updateView(vs.currentview.Primary, vs.getNewServerForBackup())
+		}
+
+	}
+
+
+
 }
 
 //
@@ -112,6 +158,7 @@ func StartServer(me string) *ViewServer {
 	vs.me = me
 	// Your vs.* initializations here.
 	vs.ack = true
+	vs.serversPingTime = make(map[string]time.Time)
 
 	// tell net/rpc about our RPC server and handlers.
 	rpcs := rpc.NewServer()
