@@ -28,6 +28,16 @@ type PBServer struct {
 
 }
 
+// Debugging
+const Debug = 1
+
+func DPrintf(a ...interface{}) (n int, err error) {
+	if Debug > 0 {
+		n, err = fmt.Println(a...)
+	}
+	return
+}
+
 
 func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 
@@ -61,7 +71,7 @@ func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error 
 	if pb.view.Primary != pb.me {
 		reply.Err = ErrWrongServer
 	} else if pb.view.Backup != "" {
-		ok := call(pb.view.Backup, "PBServer.SyncPut", args, reply)
+		ok := call(pb.view.Backup, "PBServer.Syncbackup", args, reply)
 		if !ok {
 			return RPCERR
 		}
@@ -77,6 +87,32 @@ func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error 
 	return nil
 }
 
+func (pb *PBServer) Syncbackup(args *PutArgs, reply *PutReply) error {
+	pb.mu.Lock()
+	defer pb.mu.Unlock()
+
+	if pb.view.Backup == pb.me {
+		pb.data[args.Key] = args.Value
+		reply.Err = OK
+	} else {
+		reply.Err = ErrWrongServer
+	}
+	return nil
+}
+
+func (pb *PBServer) SyncAll(args *SyncArgs, reply *SyncReply) error {
+	pb.mu.Lock()
+	defer pb.mu.Unlock()
+
+	if args.Viewnum == pb.view.Viewnum {
+		pb.data = args.Data
+		reply.Err = OK
+	} else {
+
+	reply.Err = ErrWrongViewnum
+	}
+	return nil
+}
 
 //
 // ping the viewserver periodically.
