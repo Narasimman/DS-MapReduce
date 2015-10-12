@@ -115,20 +115,18 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 	}
 
 	DPrintf("PutAppend start")
-	ck.mu.Lock()
-	defer ck.mu.Unlock()
 
 	reply := new(PutAppendReply)
 	uuid := strconv.FormatInt(nrand(), 10)
 	ok := call(ck.view.Primary, "PBServer.PutAppend", &PutAppendArgs{Key: key, Value: value,
-	 Operation: op, Client: ck.view.Primary ,UUID: uuid}, reply)
+		Operation: op, Client: ck.view.Primary, UUID: uuid}, reply)
 
 	for !(ok && reply.Err == OK) {
 		DPrintf("Retry PutAppend")
 		ck.view, ok = ck.vs.Get()
 		if ok {
 			ok = call(ck.view.Primary, "PBServer.PutAppend", &PutAppendArgs{Key: key, Value: value,
-			Operation: op, Client: ck.view.Primary, UUID: uuid}, reply)
+				Operation: op, Client: ck.view.Primary, UUID: uuid}, reply)
 		}
 
 		time.Sleep(viewservice.PingInterval)
@@ -140,6 +138,9 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 // must keep trying until it succeeds.
 //
 func (ck *Clerk) Put(key string, value string) {
+	ck.mu.Lock()
+	defer ck.mu.Unlock()
+
 	ck.PutAppend(key, value, "Put")
 }
 
@@ -148,5 +149,8 @@ func (ck *Clerk) Put(key string, value string) {
 // must keep trying until it succeeds.
 //
 func (ck *Clerk) Append(key string, value string) {
+	ck.mu.Lock()
+	defer ck.mu.Unlock()
+
 	ck.PutAppend(key, value, "Append")
 }

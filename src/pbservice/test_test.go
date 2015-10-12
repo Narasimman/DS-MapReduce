@@ -428,6 +428,7 @@ func checkAppends(t *testing.T, v string, counts []int) {
 			}
 			off1 := strings.LastIndex(v, wanted)
 			if off1 != off {
+				fmt.Println(">>>>>>>>>>   ", v, wanted)
 				t.Fatalf("duplicate element in Append result")
 			}
 			if off <= lastoff {
