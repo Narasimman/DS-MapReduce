@@ -22,6 +22,17 @@ type ViewServer struct {
 	ack bool
 }
 
+
+// Debugging
+const Debug = 0
+
+func DPrintf(a ...interface{}) (n int, err error) {
+	if Debug > 0 {
+		n, err = fmt.Println(a...)
+	}
+	return
+}
+
 func (vs *ViewServer) updateView(primary string, backup string) bool {
 	if vs.ack && (vs.currentview.Primary != primary || vs.currentview.Backup != backup) {
 		DPrintf("Updating view")

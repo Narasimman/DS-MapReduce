@@ -24,12 +24,12 @@ type PBServer struct {
 	// Your declarations here.
 	view viewservice.View
 	data map[string]string
-	counter int
+	pingCount int
 
 }
 
 // Debugging
-const Debug = 1
+const Debug = 0
 
 func DPrintf(a ...interface{}) (n int, err error) {
 	if Debug > 0 {
@@ -46,7 +46,8 @@ func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 	defer pb.mu.Unlock()
 
 	if pb.me != pb.view.Primary {
-		return ErrWrongServer
+		reply.Err = ErrWrongServer
+		return nil
 	}
 
 	val, ok := pb.data[args.Key]
@@ -68,6 +69,7 @@ func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error 
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 
+	DPrintf("Inside put append")
 	if pb.view.Primary != pb.me {
 		reply.Err = ErrWrongServer
 	} else if pb.view.Backup != "" {
@@ -81,19 +83,30 @@ func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error 
 		}
 	}
 
-	pb.data[args.Key] = args.Value
+	if args.Operation == "Append" {
+		pb.data[args.Key] = pb.data[args.Key] + args.Value
+	} else {
+		pb.data[args.Key] = args.Value
+	}
+
 	reply.Err = OK
 
 	return nil
 }
 
-func (pb *PBServer) Syncbackup(args *PutArgs, reply *PutReply) error {
+func (pb *PBServer) Syncbackup(args *PutAppendArgs, reply *PutAppendReply) error {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 
 	if pb.view.Backup != pb.me {
 		reply.Err = ErrWrongServer
 		return nil
+	}
+
+	if args.Operation == "Append" {
+		pb.data[args.Key] = pb.data[args.Key] + args.Value
+	} else {
+		pb.data[args.Key] = args.Value
 	}
 
 	pb.data[args.Key] = args.Value
@@ -107,7 +120,7 @@ func (pb *PBServer) SyncAll(args *SyncArgs, reply *SyncReply) error {
 	defer pb.mu.Unlock()
 
 	if args.Viewnum != pb.view.Viewnum {
-		reply.Err = ErrWrongViewnum
+		reply.Err = ErrWrongView
 		return nil
 	}
 
@@ -126,6 +139,32 @@ func (pb *PBServer) SyncAll(args *SyncArgs, reply *SyncReply) error {
 func (pb *PBServer) tick() {
 
 	// Your code here.
+	pb.mu.Lock()
+	defer pb.mu.Unlock()
+
+	if pb.pingCount > viewservice.DeadPings {
+		pb.view.Viewnum = 0
+		pb.view.Primary = ""
+		pb.view.Backup = ""
+		pb.pingCount = 0
+	} else {
+		view, err := pb.vs.Ping(pb.view.Viewnum)
+		if err == nil {
+			pb.pingCount = 0
+			if view.Primary == pb.me && view.Backup != "" && view.Backup != pb.view.Backup {
+				// need to Sync
+				reply := new(SyncReply)
+				ok := call(view.Backup, "PBServer.SyncAll", &SyncArgs{Data: pb.data, Viewnum: view.Viewnum}, reply)
+				if ok && reply.Err == OK {
+					pb.view = view
+				}
+			} else {
+				pb.view = view
+			}
+		} else {
+			pb.pingCount++
+		}
+	}
 }
 
 // tell the server to shut itself down.
@@ -159,6 +198,14 @@ func StartServer(vshost string, me string) *PBServer {
 	pb.me = me
 	pb.vs = viewservice.MakeClerk(me, vshost)
 	// Your pb.* initializations here.
+
+	var err error
+	pb.view, err = pb.vs.Ping(0)
+	for err != nil {
+		pb.view, err = pb.vs.Ping(0)
+		time.Sleep(viewservice.PingInterval)
+	}
+	pb.data = make(map[string]string)
 
 	rpcs := rpc.NewServer()
 	rpcs.Register(pb)
