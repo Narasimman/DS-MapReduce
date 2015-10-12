@@ -22,6 +22,10 @@ type PBServer struct {
 	me         string
 	vs         *viewservice.Clerk
 	// Your declarations here.
+	view viewservice.View
+	data map[string]string
+	counter int
+
 }
 
 
