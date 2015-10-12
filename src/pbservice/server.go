@@ -12,8 +12,6 @@ import "os"
 import "syscall"
 import "math/rand"
 
-
-
 type PBServer struct {
 	mu         sync.Mutex
 	l          net.Listener
@@ -38,10 +36,7 @@ func DPrintf(a ...interface{}) (n int, err error) {
 	return
 }
 
-
 func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
-
-	// Your code here.
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 
@@ -64,8 +59,6 @@ func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 
 
 func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
-
-	// Your code here.
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 
@@ -94,6 +87,11 @@ func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error 
 	return nil
 }
 
+/*
+RPC Backup sync function called by PutAppend. The primary first makes call to
+sync with backup and only after this rpc call succeeds and the primary get the ack
+it puts into its database and proceeds.
+*/
 func (pb *PBServer) Syncbackup(args *PutAppendArgs, reply *PutAppendReply) error {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
@@ -109,11 +107,16 @@ func (pb *PBServer) Syncbackup(args *PutAppendArgs, reply *PutAppendReply) error
 		pb.data[args.Key] = args.Value
 	}
 
-	pb.data[args.Key] = args.Value
 	reply.Err = OK
 
 	return nil
 }
+
+/*
+This RPC function is to perform a complete state transfer from primary to backup
+this is called in the tick function when the backup is reset and needs a state transfer before
+it can acts as a fully functional backup
+*/
 
 func (pb *PBServer) SyncAll(args *SyncArgs, reply *SyncReply) error {
 	pb.mu.Lock()
@@ -137,8 +140,6 @@ func (pb *PBServer) SyncAll(args *SyncArgs, reply *SyncReply) error {
 //   manage transfer of state from primary to new backup.
 //
 func (pb *PBServer) tick() {
-
-	// Your code here.
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 
@@ -152,7 +153,7 @@ func (pb *PBServer) tick() {
 		if err == nil {
 			pb.pingCount = 0
 			if view.Primary == pb.me && view.Backup != "" && view.Backup != pb.view.Backup {
-				// need to Sync
+				DPrintf("Sync whole database with backup")
 				reply := new(SyncReply)
 				ok := call(view.Backup, "PBServer.SyncAll", &SyncArgs{Data: pb.data, Viewnum: view.Viewnum}, reply)
 				if ok && reply.Err == OK {
