@@ -98,7 +98,7 @@ func (ck *Clerk) Get(key string) string {
 	for !(ok && reply.Err == OK) {
 		ck.view, ok = ck.vs.Get()
 		if ok {
-			ok := call(ck.view.Primary, "PBserver.Get", &GetArgs{Key: key}, reply)
+			ok = call(ck.view.Primary, "PBserver.Get", &GetArgs{Key: key}, reply)
 		}
 
 		time.Sleep(viewservice.PingInterval)
@@ -117,6 +117,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		return
 	}
 
+	DPrintf("PutAppend start")
 	ck.mu.Lock()
 	defer ck.mu.Unlock()
 
@@ -126,7 +127,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 	for !(ok && reply.Err == OK) {
 		ck.view, ok = ck.vs.Get()
 		if ok {
-			ok := call(ck.view.Primary, "PBserver.PutAppend", &PutAppendArgs{Key: key, Value:value, Operation: op}, reply)
+			ok = call(ck.view.Primary, "PBserver.PutAppend", &PutAppendArgs{Key: key, Value:value, Operation: op}, reply)
 		}
 
 		time.Sleep(viewservice.PingInterval)

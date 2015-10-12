@@ -91,12 +91,14 @@ func (pb *PBServer) Syncbackup(args *PutArgs, reply *PutReply) error {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 
-	if pb.view.Backup == pb.me {
-		pb.data[args.Key] = args.Value
-		reply.Err = OK
-	} else {
+	if pb.view.Backup != pb.me {
 		reply.Err = ErrWrongServer
+		return nil
 	}
+
+	pb.data[args.Key] = args.Value
+	reply.Err = OK
+
 	return nil
 }
 
@@ -104,13 +106,14 @@ func (pb *PBServer) SyncAll(args *SyncArgs, reply *SyncReply) error {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
 
-	if args.Viewnum == pb.view.Viewnum {
-		pb.data = args.Data
-		reply.Err = OK
-	} else {
-
-	reply.Err = ErrWrongViewnum
+	if args.Viewnum != pb.view.Viewnum {
+		reply.Err = ErrWrongViewnum
+		return nil
 	}
+
+	pb.data = args.Data
+	reply.Err = OK
+
 	return nil
 }
 
