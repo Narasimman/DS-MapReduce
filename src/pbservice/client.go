@@ -16,7 +16,6 @@ type Clerk struct {
 	vs   *viewservice.Clerk
 	view viewservice.View
 	mu   sync.Mutex
-	// Your declarations here
 }
 
 // this may come in handy.
@@ -116,17 +115,24 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 
 	DPrintf("PutAppend start")
 
+	// Construct arguments
 	reply := new(PutAppendReply)
-	uuid := strconv.FormatInt(nrand(), 10)
-	ok := call(ck.view.Primary, "PBServer.PutAppend", &PutAppendArgs{Key: key, Value: value,
-		Operation: op, Client: ck.view.Primary, UUID: uuid}, reply)
+	args := &PutAppendArgs {
+			Key: key,
+			Value: value,
+			Operation: op,
+			Client: ck.view.Primary,
+			UUID: strconv.FormatInt(nrand(), 10),
+		}
+
+	// First attempt to put/Append
+	ok := call(ck.view.Primary, "PBServer.PutAppend", args, reply)
 
 	for !(ok && reply.Err == OK) {
 		DPrintf("Retry PutAppend")
 		ck.view, ok = ck.vs.Get()
 		if ok {
-			ok = call(ck.view.Primary, "PBServer.PutAppend", &PutAppendArgs{Key: key, Value: value,
-				Operation: op, Client: ck.view.Primary, UUID: uuid}, reply)
+			ok = call(ck.view.Primary, "PBServer.PutAppend", args, reply)
 		}
 
 		time.Sleep(viewservice.PingInterval)

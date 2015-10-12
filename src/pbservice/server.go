@@ -19,7 +19,7 @@ type PBServer struct {
 	unreliable int32 // for testing
 	me         string
 	vs         *viewservice.Clerk
-	// Your declarations here.
+
 	view      viewservice.View
 	requests  map[string]string
 	data      map[string]string
@@ -68,6 +68,7 @@ func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error 
 	}
 
 	if pb.requests[args.Client] == args.UUID {
+		DPrintf("Duplicate Request")
 		reply.Err = OK
 		return nil
 	}
@@ -113,6 +114,7 @@ func (pb *PBServer) Syncbackup(args *PutAppendArgs, reply *PutAppendReply) error
 	}
 
 	if pb.requests[args.Client] == args.UUID {
+		DPrintf("Duplicate Request")
 		reply.Err = OK
 		return nil
 	}
@@ -143,6 +145,7 @@ func (pb *PBServer) SyncAll(args *SyncArgs, reply *SyncReply) error {
 		return nil
 	}
 
+	DPrintf("Complete state transfer!")
 	pb.data = args.Data
 	reply.Err = OK
 
@@ -176,6 +179,7 @@ func (pb *PBServer) tick() {
 					pb.view = view
 				}
 			} else {
+				DPrintf("Update the view for this server")
 				pb.view = view
 			}
 		} else {
