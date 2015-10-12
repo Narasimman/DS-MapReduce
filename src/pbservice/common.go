@@ -37,10 +37,9 @@ type GetReply struct {
 	Value string
 }
 
-
 // Your RPC definitions here.
 type SyncArgs struct {
-	Data map[string]string
+	Data    map[string]string
 	Viewnum uint
 }
 type SyncReply struct {

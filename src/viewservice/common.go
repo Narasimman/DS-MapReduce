@@ -78,4 +78,3 @@ type GetArgs struct {
 type GetReply struct {
 	View View
 }
-

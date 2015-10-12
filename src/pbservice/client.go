@@ -1,8 +1,8 @@
 package pbservice
 
 import (
-	"viewservice"
 	"time"
+	"viewservice"
 )
 import "net/rpc"
 import "fmt"
@@ -11,11 +11,10 @@ import "sync"
 import "crypto/rand"
 import "math/big"
 
-
 type Clerk struct {
-	vs *viewservice.Clerk
+	vs   *viewservice.Clerk
 	view viewservice.View
-	mu sync.Mutex
+	mu   sync.Mutex
 	// Your declarations here
 }
 
@@ -39,7 +38,6 @@ func MakeClerk(vshost string, me string) *Clerk {
 
 	return ck
 }
-
 
 //
 // call() sends an RPC to the rpcname handler on server srv
@@ -122,12 +120,12 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 	defer ck.mu.Unlock()
 
 	reply := new(PutAppendReply)
-	ok := call(ck.view.Primary, "PBServer.PutAppend", &PutAppendArgs{Key: key, Value:value, Operation: op}, reply)
+	ok := call(ck.view.Primary, "PBServer.PutAppend", &PutAppendArgs{Key: key, Value: value, Operation: op}, reply)
 
 	for !(ok && reply.Err == OK) {
 		ck.view, ok = ck.vs.Get()
 		if ok {
-			ok = call(ck.view.Primary, "PBServer.PutAppend", &PutAppendArgs{Key: key, Value:value, Operation: op}, reply)
+			ok = call(ck.view.Primary, "PBServer.PutAppend", &PutAppendArgs{Key: key, Value: value, Operation: op}, reply)
 		}
 
 		time.Sleep(viewservice.PingInterval)

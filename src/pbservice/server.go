@@ -20,10 +20,9 @@ type PBServer struct {
 	me         string
 	vs         *viewservice.Clerk
 	// Your declarations here.
-	view viewservice.View
-	data map[string]string
+	view      viewservice.View
+	data      map[string]string
 	pingCount int
-
 }
 
 // Debugging
@@ -57,7 +56,6 @@ func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 	return nil
 }
 
-
 func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
@@ -66,7 +64,9 @@ func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error 
 	if pb.view.Primary != pb.me {
 		reply.Err = ErrWrongServer
 	} else if pb.view.Backup != "" {
+		DPrintf("Put into the backup first")
 		ok := call(pb.view.Backup, "PBServer.Syncbackup", args, reply)
+
 		if !ok {
 			return RPCERR
 		}
@@ -192,7 +192,6 @@ func (pb *PBServer) setunreliable(what bool) {
 func (pb *PBServer) isunreliable() bool {
 	return atomic.LoadInt32(&pb.unreliable) != 0
 }
-
 
 func StartServer(vshost string, me string) *PBServer {
 	pb := new(PBServer)

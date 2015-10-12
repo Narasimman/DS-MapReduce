@@ -18,10 +18,9 @@ type ViewServer struct {
 
 	// Your declarations here.
 	currentview View
-	lastseen map[string]time.Time
-	ack bool
+	lastseen    map[string]time.Time
+	ack         bool
 }
-
 
 // Debugging
 const Debug = 0
@@ -50,7 +49,7 @@ func (vs *ViewServer) setNextViewNumber() {
 	if vs.currentview.Viewnum == ^uint(0) {
 		vs.currentview.Viewnum = 0
 	} else {
-		vs.currentview.Viewnum++;
+		vs.currentview.Viewnum++
 	}
 }
 
@@ -87,10 +86,10 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 	// Very first View Point as the view number is 0
 	if viewnumber == 0 {
 		if vs.currentview.Primary == "" && vs.currentview.Backup == "" {
- 			DPrintf("inside first view")
+			DPrintf("inside first view")
 			vs.updateView(args.Me, "")
 		} else if vs.currentview.Primary == args.Me {
-			DPrintf("primary has just restarted. So, promote backup as the primary");
+			DPrintf("primary has just restarted. So, promote backup as the primary")
 			vs.promoteBackup()
 		} else if vs.currentview.Backup == args.Me {
 			DPrintf("Backup is just restarted. So, get a new backup server")
@@ -136,7 +135,7 @@ func (vs *ViewServer) tick() {
 
 	if vs.ack {
 		for key, value := range vs.lastseen {
-			if time.Since(value) > DeadPings * PingInterval {
+			if time.Since(value) > DeadPings*PingInterval {
 				delete(vs.lastseen, key)
 				if key == vs.currentview.Primary {
 					DPrintf("Primary is dead!")
@@ -155,8 +154,6 @@ func (vs *ViewServer) tick() {
 		}
 
 	}
-
-
 
 }
 
