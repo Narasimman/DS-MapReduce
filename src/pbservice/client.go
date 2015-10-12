@@ -1,8 +1,12 @@
 package pbservice
 
-import "viewservice"
+import (
+	"viewservice"
+	"time"
+)
 import "net/rpc"
 import "fmt"
+import "sync"
 
 import "crypto/rand"
 import "math/big"
@@ -10,6 +14,8 @@ import "math/big"
 
 type Clerk struct {
 	vs *viewservice.Clerk
+	view viewservice.View
+	mu sync.Mutex
 	// Your declarations here
 }
 
@@ -25,6 +31,11 @@ func MakeClerk(vshost string, me string) *Clerk {
 	ck := new(Clerk)
 	ck.vs = viewservice.MakeClerk(me, vshost)
 	// Your ck.* initializations here
+	ok := false
+	if !ok {
+		ck.view, ok = ck.vs.Get()
+		time.Sleep(viewservice.PingInterval)
+	}
 
 	return ck
 }
@@ -74,8 +85,26 @@ func call(srv string, rpcname string,
 func (ck *Clerk) Get(key string) string {
 
 	// Your code here.
+	if key == "" {
+		return ErrNoKey
+	}
 
-	return "???"
+	ck.mu.Lock()
+	defer ck.mu.Unlock()
+
+	reply := new(GetReply)
+	ok := call(ck.view.Primary, "PBserver.Get", &GetArgs{Key: key}, reply)
+
+	for !(ok && reply.Err == OK) {
+		ck.view, ok = ck.vs.Get()
+		if ok {
+			ok := call(ck.view.Primary, "PBserver.Get", &GetArgs{Key: key}, reply)
+		}
+
+		time.Sleep(viewservice.PingInterval)
+	}
+
+	return reply.Value
 }
 
 //
@@ -84,6 +113,24 @@ func (ck *Clerk) Get(key string) string {
 func (ck *Clerk) PutAppend(key string, value string, op string) {
 
 	// Your code here.
+	if key == "" {
+		return
+	}
+
+	ck.mu.Lock()
+	defer ck.mu.Unlock()
+
+	reply := new(PutAppendReply)
+	ok := call(ck.view.Primary, "PBserver.PutAppend", &PutAppendArgs{Key: key, Value:value, Operation: op}, reply)
+
+	for !(ok && reply.Err == OK) {
+		ck.view, ok = ck.vs.Get()
+		if ok {
+			ok := call(ck.view.Primary, "PBserver.PutAppend", &PutAppendArgs{Key: key, Value:value, Operation: op}, reply)
+		}
+
+		time.Sleep(viewservice.PingInterval)
+	}
 }
 
 //

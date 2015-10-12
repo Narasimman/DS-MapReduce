@@ -18,7 +18,7 @@ type ViewServer struct {
 
 	// Your declarations here.
 	currentview View
-	serversPingTime map[string]time.Time
+	lastseen map[string]time.Time
 	ack bool
 }
 
@@ -52,7 +52,7 @@ func (vs *ViewServer) assignBackup() {
 }
 
 func (vs *ViewServer) getNewServerForBackup() string {
-	for key, _ := range vs.serversPingTime {
+	for key, _ := range vs.lastseen {
 		//Return the server that is neither primary/backup
 		if vs.currentview.Primary != key && vs.currentview.Backup != key {
 			return key
@@ -70,7 +70,7 @@ func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 
 	DPrintf("Server: ", args.Viewnum)
 	vs.mu.Lock()
-	vs.serversPingTime[args.Me] = time.Now()
+	vs.lastseen[args.Me] = time.Now()
 	viewnumber := args.Viewnum
 
 	// Very first View Point as the view number is 0
@@ -124,9 +124,9 @@ func (vs *ViewServer) tick() {
 	defer vs.mu.Unlock()
 
 	if vs.ack {
-		for key, value := range vs.serversPingTime {
+		for key, value := range vs.lastseen {
 			if time.Since(value) > DeadPings * PingInterval {
-				delete(vs.serversPingTime, key)
+				delete(vs.lastseen, key)
 				if key == vs.currentview.Primary {
 					DPrintf("Primary is dead!")
 					vs.promoteBackup()
@@ -176,7 +176,7 @@ func StartServer(me string) *ViewServer {
 	vs.me = me
 	// Your vs.* initializations here.
 	vs.ack = true
-	vs.serversPingTime = make(map[string]time.Time)
+	vs.lastseen = make(map[string]time.Time)
 
 	// tell net/rpc about our RPC server and handlers.
 	rpcs := rpc.NewServer()
