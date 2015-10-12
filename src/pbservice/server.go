@@ -21,6 +21,7 @@ type PBServer struct {
 	vs         *viewservice.Clerk
 	// Your declarations here.
 	view      viewservice.View
+	requests  map[string]string
 	data      map[string]string
 	pingCount int
 }
@@ -63,7 +64,15 @@ func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error 
 	DPrintf("Inside put append")
 	if pb.view.Primary != pb.me {
 		reply.Err = ErrWrongServer
-	} else if pb.view.Backup != "" {
+		return nil
+	}
+
+	if pb.requests[args.Client] == args.UUID {
+		reply.Err = OK
+		return nil
+	}
+
+	if pb.view.Backup != "" {
 		DPrintf("Put into the backup first")
 		ok := call(pb.view.Backup, "PBServer.Syncbackup", args, reply)
 
@@ -75,6 +84,8 @@ func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error 
 			return nil
 		}
 	}
+
+	pb.requests[args.Client] = args.UUID
 
 	if args.Operation == "Append" {
 		pb.data[args.Key] = pb.data[args.Key] + args.Value
@@ -98,6 +109,11 @@ func (pb *PBServer) Syncbackup(args *PutAppendArgs, reply *PutAppendReply) error
 
 	if pb.view.Backup != pb.me {
 		reply.Err = ErrWrongServer
+		return nil
+	}
+
+	if pb.requests[args.Client] == args.UUID {
+		reply.Err = OK
 		return nil
 	}
 
@@ -197,8 +213,6 @@ func StartServer(vshost string, me string) *PBServer {
 	pb := new(PBServer)
 	pb.me = me
 	pb.vs = viewservice.MakeClerk(me, vshost)
-	// Your pb.* initializations here.
-
 	var err error
 	pb.view, err = pb.vs.Ping(0)
 	for err != nil {
@@ -206,6 +220,7 @@ func StartServer(vshost string, me string) *PBServer {
 		time.Sleep(viewservice.PingInterval)
 	}
 	pb.data = make(map[string]string)
+	pb.requests = make(map[string]string)
 
 	rpcs := rpc.NewServer()
 	rpcs.Register(pb)

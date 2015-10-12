@@ -7,6 +7,7 @@ import (
 import "net/rpc"
 import "fmt"
 import "sync"
+import "strconv"
 
 import "crypto/rand"
 import "math/big"
@@ -109,8 +110,6 @@ func (ck *Clerk) Get(key string) string {
 // send a Put or Append RPC
 //
 func (ck *Clerk) PutAppend(key string, value string, op string) {
-
-	// Your code here.
 	if key == "" {
 		return
 	}
@@ -120,12 +119,16 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 	defer ck.mu.Unlock()
 
 	reply := new(PutAppendReply)
-	ok := call(ck.view.Primary, "PBServer.PutAppend", &PutAppendArgs{Key: key, Value: value, Operation: op}, reply)
+	uuid := strconv.FormatInt(nrand(), 10)
+	ok := call(ck.view.Primary, "PBServer.PutAppend", &PutAppendArgs{Key: key, Value: value,
+	 Operation: op, Client: ck.view.Primary ,UUID: uuid}, reply)
 
 	for !(ok && reply.Err == OK) {
+		DPrintf("Retry PutAppend")
 		ck.view, ok = ck.vs.Get()
 		if ok {
-			ok = call(ck.view.Primary, "PBServer.PutAppend", &PutAppendArgs{Key: key, Value: value, Operation: op}, reply)
+			ok = call(ck.view.Primary, "PBServer.PutAppend", &PutAppendArgs{Key: key, Value: value,
+			Operation: op, Client: ck.view.Primary, UUID: uuid}, reply)
 		}
 
 		time.Sleep(viewservice.PingInterval)
