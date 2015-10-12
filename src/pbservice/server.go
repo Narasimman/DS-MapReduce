@@ -32,6 +32,21 @@ type PBServer struct {
 func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 
 	// Your code here.
+	pb.mu.Lock()
+	defer pb.mu.Unlock()
+
+	if pb.me != pb.view.Primary {
+		return ErrWrongServer
+	}
+
+	val, ok := pb.data[args.Key]
+
+	if ok {
+		reply.Value = val
+	} else {
+		reply.Value = ""
+	}
+	reply.Err = OK
 
 	return nil
 }
@@ -40,7 +55,24 @@ func (pb *PBServer) Get(args *GetArgs, reply *GetReply) error {
 func (pb *PBServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 
 	// Your code here.
+	pb.mu.Lock()
+	defer pb.mu.Unlock()
 
+	if pb.view.Primary != pb.me {
+		reply.Err = ErrWrongServer
+	} else if pb.view.Backup != "" {
+		ok := call(pb.view.Backup, "PBServer.SyncPut", args, reply)
+		if !ok {
+			return RPCERR
+		}
+
+		if reply.Err != OK {
+			return nil
+		}
+	}
+
+	pb.data[args.Key] = args.Value
+	reply.Err = OK
 
 	return nil
 }
