@@ -71,6 +71,16 @@ type Paxos struct {
 	dones map[int]int			//map of all dones by all paxos peers
 }
 
+// Debugging
+const Debug = 1
+
+func DPrintf(a ...interface{}) (n int, err error) {
+	if Debug > 0 {
+		n, err = fmt.Println(a...)
+	}
+	return
+}
+
 //
 // call() sends an RPC to the rpcname handler on server srv
 // with arguments args, waits for the reply, and leaves the
@@ -117,6 +127,12 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 func (px *Paxos) Start(seq int, v interface{}) {
 	// Your code here.
 
+	DPrintf("Application starts on Paxos agreement")
+
+	if seq < px.Min() {
+		//ignore seq less than the min
+		return
+	}
 }
 
 //
@@ -172,7 +188,18 @@ func (px *Paxos) Max() int {
 //
 func (px *Paxos) Min() int {
 	// You code here.
-	return 0
+	px.mu.Lock()
+	defer px.mu.Unlock()
+
+	min := int(^uint(0) >> 1)
+
+	for i := range px.dones {
+		if min > px.dones[i] {
+			min = px.dones[i]
+		}
+	}
+
+	return min
 }
 
 //
