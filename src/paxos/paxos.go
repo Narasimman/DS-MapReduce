@@ -65,6 +65,10 @@ type Paxos struct {
 	me         int // index into peers[]
 
 	// Your data here.
+	instaces map[int]*instance	//map of paxos instances for each sequence
+	max_known					//highest sequence known to this peer
+	done int						//is this peer done?
+	dones map[int]int			//map of all dones by all paxos peers
 }
 
 //
@@ -112,6 +116,7 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 //
 func (px *Paxos) Start(seq int, v interface{}) {
 	// Your code here.
+
 }
 
 //
@@ -131,7 +136,10 @@ func (px *Paxos) Done(seq int) {
 //
 func (px *Paxos) Max() int {
 	// Your code here.
-	return 0
+	px.mu.Lock()
+	defer px.mu.Unlock()
+
+	return px.max_known
 }
 
 //
