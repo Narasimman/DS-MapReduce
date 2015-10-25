@@ -76,8 +76,6 @@ func (vs *ViewServer) getNewServerForBackup() string {
 //
 func (vs *ViewServer) Ping(args *PingArgs, reply *PingReply) error {
 
-	// Your code here.
-
 	DPrintf("Server: ", args.Viewnum)
 	vs.mu.Lock()
 	vs.lastseen[args.Me] = time.Now()

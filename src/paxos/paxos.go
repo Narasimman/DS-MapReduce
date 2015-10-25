@@ -43,6 +43,18 @@ const (
 	Forgotten      // decided but forgotten.
 )
 
+type instance struct {
+	N int            	//instance number
+	V interface{}    	//value of this instance
+
+	N_p int				//highest prepare seen
+	N_a int				//highest accept seen
+	V_a interface{}		//value of the highest accept seen
+
+	Decided bool			//boolean that says if the value is decided
+	Value interface{}	//Decided value
+}
+
 type Paxos struct {
 	mu         sync.Mutex
 	l          net.Listener
