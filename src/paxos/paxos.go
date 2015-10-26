@@ -44,13 +44,16 @@ const (
 )
 
 type instance struct {
+	MuP sync.Mutex
 	N int            	//instance number
 	V interface{}    	//value of this instance
 
+	MuA sync.Mutex
 	N_p int				//highest prepare seen
 	N_a int				//highest accept seen
 	V_a interface{}		//value of the highest accept seen
 
+	MuL sync.RWMutex
 	Decided bool			//boolean that says if the value is decided
 	Value interface{}	//Decided value
 }
@@ -151,19 +154,39 @@ func (px *Paxos) Start(seq int, v interface{}) {
 
 	px.mu.Unlock()
 
+	ins.MuL.Lock()
 	decided := ins.Decided
+	ins.MuL.Unlock()
 
 	if(decided) {
 		DPrintf("Start: Value is decided")
 		return
 	}
 
+	ins.MuP.Lock()
 	ins.V = v
+	ins.MuP.Unlock()
+
+	go px.proposer(seq)
 
 }
 
 func (px *Paxos) proposer(seq int) {
+
+	DPrintf("Proposer: start proposer")
+
+	px.mu.Lock()
 	ins, ok := px.instances[seq]
+
+	done := px.done
+	me   := px.me
+
+	px.mu.Unlock()
+
+	if !ok {
+		return
+	}
+
 
 
 }
