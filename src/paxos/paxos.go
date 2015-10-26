@@ -65,8 +65,8 @@ type Paxos struct {
 	me         int // index into peers[]
 
 	// Your data here.
-	instaces map[int]*instance	//map of paxos instances for each sequence
-	max_known					//highest sequence known to this peer
+	instances map[int]*instance	//map of paxos instances for each sequence
+	max_known int					//highest sequence known to this peer
 	done int						//is this peer done?
 	dones map[int]int			//map of all dones by all paxos peers
 }
@@ -127,12 +127,45 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 func (px *Paxos) Start(seq int, v interface{}) {
 	// Your code here.
 
-	DPrintf("Application starts on Paxos agreement")
+	DPrintf("Start: Application starts on Paxos agreement")
 
+	px.mu.Lock()
 	if seq < px.Min() {
-		//ignore seq less than the min
+		DPrintf("Start: ignore seq less than the min (forgotten)");
+		px.mu.Unlock()
 		return
 	}
+
+	ins, ok := px.instances[seq]
+
+	if !ok {
+		//if instance is not present already, create one
+		ins = new(instance)
+		px.instances[seq] = ins
+	}
+
+	if seq > px.max_known {
+		//update max known
+		px.max_known = seq
+	}
+
+	px.mu.Unlock()
+
+	decided := ins.Decided
+
+	if(decided) {
+		DPrintf("Start: Value is decided")
+		return
+	}
+
+	ins.V = v
+
+}
+
+func (px *Paxos) proposer(seq int) {
+	ins, ok := px.instances[seq]
+
+
 }
 
 //
@@ -257,6 +290,13 @@ func Make(peers []string, me int, rpcs *rpc.Server) *Paxos {
 	px.me = me
 
 	// Your initialization code here.
+	px.instances = make(map[int]*instance)
+	px.max_known = -1
+	px.done = -1
+
+	for k:= range px.peers {
+		px.dones[k] = -1
+	}
 
 	if rpcs != nil {
 		// caller will create socket &c
