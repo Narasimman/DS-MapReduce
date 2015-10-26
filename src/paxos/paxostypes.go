@@ -11,7 +11,7 @@ type PrepareRespArgs struct {
 	OK bool
 	N_a int
 	V_a interface{}
-	Done bool
+	Decided bool
 }
 
 type AcceptReqArgs struct {

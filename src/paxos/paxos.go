@@ -55,7 +55,7 @@ type instance struct {
 
 	MuL sync.RWMutex
 	Decided bool			//boolean that says if the value is decided
-	Value interface{}	//Decided value
+	V_d interface{}	//Decided value
 }
 
 type Paxos struct {
@@ -200,10 +200,10 @@ func (px *Paxos) proposer(seq int) {
 	// Construct req and res args
 
 	req := &PrepareReqArgs{
-		Seq : seq
-		N   : ins.N
-		Done: done
-		Me  : me
+		Seq : seq,
+		N   : ins.N,
+		Done: done,
+		Me  : me,
 	}
 	res := new(PrepareRespArgs)
 
@@ -220,6 +220,42 @@ func (px *Paxos) proposer(seq int) {
 }
 
 func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error{
+	px.mu.Lock()
+
+	ins, ok := px.instances[req.Seq]
+
+	if !ok {
+		ins = new(instance)
+		px.instances[req.Seq] = ins
+	}
+
+	px.dones[req.Me] = req.Done
+
+	px.mu.Unlock()
+
+	// Learn  the decided value
+	ins.MuL.RLock()
+	if ins.Decided {
+		DPrintf("PrepareHandler: respond decided value : " + ins.V_d )
+		res.V_a = ins.V_d
+		res.Decided = true
+		ins.MuL.RUnlock()
+		return nil
+	}
+	ins.MuL.RUnlock()
+
+	ins.MuA.Lock()
+	defer ins.MuA.Unlock()
+
+	//Check the incoming prepare request and accept or reject
+	if req.N > ins.N_p {
+		ins.N_p = req.N
+		res.N_a = ins.N_a
+		res.V_a = ins.V_a
+		res.OK = true
+	} else {
+		res.OK = false
+	}
 
 }
 
