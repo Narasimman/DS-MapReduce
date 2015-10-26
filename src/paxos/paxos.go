@@ -187,7 +187,39 @@ func (px *Paxos) proposer(seq int) {
 		return
 	}
 
+	ins.MuA.Lock()
+	max_seen := ins.N_p
+	ins.MuA.Unlock()
 
+	ins.MuP.Lock()
+	defer ins.MuP.Unlock()
+
+	ins.N = px.me + 1
+
+	// Send Prepare message.
+	// Construct req and res args
+
+	req := &PrepareReqArgs{
+		Seq : seq
+		N   : ins.N
+		Done: done
+		Me  : me
+	}
+	res := new(PrepareRespArgs)
+
+
+	for i := range px.peers {
+		ok := call(px.peers[i], "Paxos.HandlePrepare", req, res)
+
+		if ok {
+
+		}
+	}
+
+
+}
+
+func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error{
 
 }
 
