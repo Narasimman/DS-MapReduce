@@ -1,23 +1,23 @@
 package paxos
 
 type PrepareReqArgs struct {
-	Seq int
-	N   int
+	Seq  int
+	N    int
 	Done bool
-	Me int
+	Me   int
 }
 
 type PrepareRespArgs struct {
-	OK bool
-	N_a int
-	V_a interface{}
+	OK      bool
+	N_a     int
+	V_a     interface{}
 	Decided bool
 }
 
 type AcceptReqArgs struct {
 	Seq int
 	N   int
-	V interface{}
+	V   interface{}
 }
 
 type AcceptResArgs struct {

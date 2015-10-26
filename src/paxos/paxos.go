@@ -30,6 +30,7 @@ import "sync"
 import "sync/atomic"
 import "fmt"
 import "math/rand"
+import "time"
 
 // px.Status() return values, indicating
 // whether an agreement has been decided,
@@ -45,17 +46,17 @@ const (
 
 type instance struct {
 	MuP sync.Mutex
-	N int            	//instance number
-	V interface{}    	//value of this instance
+	N   int         //instance number
+	V   interface{} //value of this instance
 
 	MuA sync.Mutex
-	N_p int				//highest prepare seen
-	N_a int				//highest accept seen
-	V_a interface{}		//value of the highest accept seen
+	N_p int         //highest prepare seen
+	N_a int         //highest accept seen
+	V_a interface{} //value of the highest accept seen
 
-	MuL sync.RWMutex
-	Decided bool			//boolean that says if the value is decided
-	V_d interface{}	//Decided value
+	MuL     sync.RWMutex
+	Decided bool        //boolean that says if the value is decided
+	V_d     interface{} //Decided value
 }
 
 type Paxos struct {
@@ -68,10 +69,10 @@ type Paxos struct {
 	me         int // index into peers[]
 
 	// Your data here.
-	instances map[int]*instance	//map of paxos instances for each sequence
-	max_known int					//highest sequence known to this peer
-	done int						//is this peer done?
-	dones map[int]int			//map of all dones by all paxos peers
+	instances map[int]*instance //map of paxos instances for each sequence
+	max_known int               //highest sequence known to this peer
+	done      int               //is this peer done?
+	dones     map[int]int       //map of all dones by all paxos peers
 }
 
 // Debugging
@@ -134,7 +135,7 @@ func (px *Paxos) Start(seq int, v interface{}) {
 
 	px.mu.Lock()
 	if seq < px.Min() {
-		DPrintf("Start: ignore seq less than the min (forgotten)");
+		DPrintf("Start: ignore seq less than the min (forgotten)")
 		px.mu.Unlock()
 		return
 	}
@@ -158,7 +159,7 @@ func (px *Paxos) Start(seq int, v interface{}) {
 	decided := ins.Decided
 	ins.MuL.Unlock()
 
-	if(decided) {
+	if decided {
 		DPrintf("Start: Value is decided")
 		return
 	}
@@ -171,6 +172,10 @@ func (px *Paxos) Start(seq int, v interface{}) {
 
 }
 
+func (px *Paxos) isMajority(counter int) bool {
+	return (counter > (len(px.peers)/2))
+}
+
 func (px *Paxos) proposer(seq int) {
 
 	DPrintf("Proposer: start proposer")
@@ -179,7 +184,7 @@ func (px *Paxos) proposer(seq int) {
 	ins, ok := px.instances[seq]
 
 	done := px.done
-	me   := px.me
+	me := px.me
 
 	px.mu.Unlock()
 
@@ -194,32 +199,70 @@ func (px *Paxos) proposer(seq int) {
 	ins.MuP.Lock()
 	defer ins.MuP.Unlock()
 
+	// We need unique N here
 	ins.N = px.me + 1
 
 	// Send Prepare message.
 	// Construct req and res args
 
-	req := &PrepareReqArgs{
-		Seq : seq,
-		N   : ins.N,
+	prepReqArgs := &PrepareReqArgs{
+		Seq:  seq,
+		N:    ins.N,
 		Done: done,
-		Me  : me,
+		Me:   me,
 	}
-	res := new(PrepareRespArgs)
+	prepResArgs := new(PrepareRespArgs)
 
+	pinged := 0
+	acceptedPrepare := 0
+	v_ := ins.V
 
 	for i := range px.peers {
-		ok := call(px.peers[i], "Paxos.HandlePrepare", req, res)
+		ok := call(px.peers[i], "Paxos.HandlePrepare", prepReqArgs, prepResArgs)
 
 		if ok {
+			pinged++
+			if prepResArgs.Decided {
+				//Learn the decided value and abort.
+				// Because the value sent by this proposer was different from the
+				// value that was decided by consensus. 
+				ins.MuL.RLock()
+				defer ins.MuL.RUnlock()
 
+				ins.Decided = true
+				ins.V_d = prepResArgs.V_a
+
+				return
+
+			}
+
+			if prepResArgs.OK {
+				acceptedPrepare++
+
+				if prepResArgs.N_a > max_seen {
+					max_seen = prepResArgs.N_a
+
+					if prepResArgs.V_a != nil {
+						v_ = prepResArgs.V_a
+					}
+				}
+
+			}
+		} //
+	} // for
+	
+	if !px.isMajority(acceptedPrepare) {
+		if pinged <= (len(px.peers)/2) {
+			time.Sleep(5 * time.Millisecond)
 		}
+		DPrintf("proposer: I did not get any majority. So, I will retry.........")
+		// No majority. So, wait for a while and retry proposing again
+		go px.proposer(seq)
+		return
 	}
-
-
 }
 
-func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error{
+func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error {
 	px.mu.Lock()
 
 	ins, ok := px.instances[req.Seq]
@@ -236,7 +279,7 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error{
 	// Learn  the decided value
 	ins.MuL.RLock()
 	if ins.Decided {
-		DPrintf("PrepareHandler: respond decided value : " + ins.V_d )
+		DPrintf("PrepareHandler: respond decided value : " + ins.V_d)
 		res.V_a = ins.V_d
 		res.Decided = true
 		ins.MuL.RUnlock()
@@ -256,6 +299,8 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error{
 	} else {
 		res.OK = false
 	}
+
+	return nil
 
 }
 
@@ -385,7 +430,7 @@ func Make(peers []string, me int, rpcs *rpc.Server) *Paxos {
 	px.max_known = -1
 	px.done = -1
 
-	for k:= range px.peers {
+	for k := range px.peers {
 		px.dones[k] = -1
 	}
 
