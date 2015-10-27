@@ -51,6 +51,7 @@ func ndecided(t *testing.T, pxa []*Paxos, seq int) int {
 func waitn(t *testing.T, pxa []*Paxos, seq int, wanted int) {
 	to := 10 * time.Millisecond
 	for iters := 0; iters < 30; iters++ {
+		DPrintf("waiting", ndecided(t, pxa, seq), wanted)
 		if ndecided(t, pxa, seq) >= wanted {
 			break
 		}
@@ -129,6 +130,7 @@ func TestBasic(t *testing.T) {
 	fmt.Printf("Test: Single proposer ...\n")
 
 	pxa[0].Start(0, "hello")
+	DPrintf("after Start in test")
 	waitn(t, pxa, 0, npaxos)
 
 	fmt.Printf("  ... Passed\n")

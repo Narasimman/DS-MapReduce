@@ -20,7 +20,7 @@ type instance struct {
 type PrepareReqArgs struct {
 	Seq  int
 	N    int
-	Done bool
+	Done int
 	Me   int
 }
 
@@ -42,7 +42,7 @@ type AcceptResArgs struct {
 }
 
 type DecidedReqArgs struct {
-	seq int
+	Seq int
 	V   interface{}
 }
 

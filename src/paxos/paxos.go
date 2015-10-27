@@ -117,17 +117,19 @@ func (px *Paxos) Start(seq int, v interface{}) {
 	// Your code here.
 
 	DPrintf("Start: Application starts on Paxos agreement")
-
+	min := px.Min()
 	px.mu.Lock()
-	if seq < px.Min() {
+	
+	if seq < min {
 		DPrintf("Start: ignore seq less than the min (forgotten)")
 		px.mu.Unlock()
 		return
 	}
 
 	ins, ok := px.instances[seq]
-
+	
 	if !ok {
+		DPrintf("Start: instance not found")
 		//if instance is not present already, create one
 		ins = new(instance)
 		px.instances[seq] = ins
@@ -140,6 +142,7 @@ func (px *Paxos) Start(seq int, v interface{}) {
 
 	px.mu.Unlock()
 
+	DPrintf("start: Read decided value")
 	ins.MuL.Lock()
 	decided := ins.Decided
 	ins.MuL.Unlock()
@@ -153,8 +156,10 @@ func (px *Paxos) Start(seq int, v interface{}) {
 	ins.V = v
 	ins.MuP.Unlock()
 
+	DPrintf("start: calling proposer")
 	go px.proposer(seq)
-
+	DPrintf("Start: End of start")
+	
 }
 
 func (px *Paxos) isMajority(counter int) bool {
@@ -185,7 +190,11 @@ func (px *Paxos) proposer(seq int) {
 	defer ins.MuP.Unlock()
 
 	// We need unique N here
-	ins.N = px.me + 1
+	if ins.N == 0 {
+		ins.N = px.me + 1
+	} else {
+		ins.N = (max_seen/len(px.peers) + 1) * len(px.peers) + px.me + 1
+	}
 
 	// Send Prepare message.
 	// Construct req and res args
@@ -236,7 +245,8 @@ func (px *Paxos) proposer(seq int) {
 		} //
 	} // for
 	
-	if !px.isMajority(acceptedPrepare) {
+	//if !px.isMajority(acceptedPrepare) {
+	if acceptedPrepare <= (len(px.peers)/2) {
 		if pinged <= (len(px.peers)/2) {
 			time.Sleep(5 * time.Millisecond)
 		}
@@ -266,13 +276,14 @@ func (px *Paxos) proposer(seq int) {
 		}
 	}
 	
-	if !px.isMajority(acceptedCount) {
+	//if !px.isMajority(acceptedCount) {
+	if acceptedCount <= (len(px.peers)/2) {
 		go px.proposer(seq)
 		return
 	}
 	
 	//Now, it's time for send out decision.
-	DPrintf("Send decided value. Consensus has been reached!")
+	DPrintf("Send decided value. Consensus has been reached!", v_)
 	decReqArgs := &DecidedReqArgs {
 		Seq : seq,
 		V   : v_,
@@ -281,11 +292,12 @@ func (px *Paxos) proposer(seq int) {
 	decResArgs := new(DecidedResArgs)
 	
 	for i := range px.peers {
-		call(px.peers[i], "Paxos.handleDecided", decReqArgs, decResArgs)
+		call(px.peers[i], "Paxos.HandleDecided", decReqArgs, decResArgs)
 	}
 	
-	
-	
+	px.HandleDecided(decReqArgs,decResArgs)
+	DPrintf("End of proposer")
+	return
 }
 
 func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error {
@@ -305,7 +317,7 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error 
 	// Learn  the decided value
 	ins.MuL.RLock()
 	if ins.Decided {
-		DPrintf("PrepareHandler: respond decided value : " + ins.V_d)
+		DPrintf("PrepareHandler: respond decided value : ")
 		res.V_a = ins.V_d
 		res.Decided = true
 		ins.MuL.RUnlock()
@@ -330,16 +342,14 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error 
 
 }
 
-func (px *Paxos) handleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
-	px.mu.Lock()
-	
+func (px *Paxos) HandleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
+	px.mu.Lock()	
 	ins, ok := px.instances[req.Seq]
 	
 	if !ok {
 		ins = new(instance)
 		px.instances[req.Seq] = ins
-	}
-	
+	}	
 	px.mu.Unlock()
 	
 	ins.MuA.Lock()
@@ -357,20 +367,22 @@ func (px *Paxos) handleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
 	return nil	
 } 
 
-func (px *Paxos) handleDecided(req *DecidedReqArgs, res *DecidedResArgs) {
-	px.mu.Lock()
+func (px *Paxos) HandleDecided(req *DecidedReqArgs, res *DecidedResArgs) error {
+	DPrintf("Handle decided value")
 	
-	ins, ok := px.instances[req.seq]
+	px.mu.Lock()	
+	
+	ins, ok := px.instances[req.Seq]
 	
 	if !ok {
 		ins = new(instance)
-		px.instances[req.seq] = ins
-	}
-	
+		px.instances[req.Seq] = ins
+	}	
 	px.mu.Unlock()
 	
 	ins.MuL.Lock()
 	defer ins.MuL.Unlock()
+	
 	
 	ins.Decided = true
 	ins.V_d = req.V
@@ -393,7 +405,7 @@ func (px *Paxos) Done(seq int) {
 	if px.done < seq {
 		px.done = seq
 		for k := range px.instances {
-			if px.instances[k] <= seq {
+			if k <= seq {
 				delete(px.instances, k)
 			}
  		}
@@ -466,7 +478,24 @@ func (px *Paxos) Min() int {
 //
 func (px *Paxos) Status(seq int) (Fate, interface{}) {
 	// Your code here.
-	return Pending, nil
+	
+	if seq < px.Min() {
+		return Forgotten, nil
+	}
+	
+	px.mu.Lock()	
+	
+	ins, ok := px.instances[seq]	
+	px.mu.Unlock()
+	
+	if !ok {
+		return Pending, nil
+	}
+	
+	ins.MuL.Lock()
+	defer ins.MuL.Unlock()
+	
+	return Decided, ins.V_d
 }
 
 //
@@ -515,6 +544,7 @@ func Make(peers []string, me int, rpcs *rpc.Server) *Paxos {
 	px.instances = make(map[int]*instance)
 	px.max_known = -1
 	px.done = -1
+	px.dones = make(map[int]int)
 
 	for k := range px.peers {
 		px.dones[k] = -1
