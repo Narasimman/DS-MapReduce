@@ -355,7 +355,7 @@ func (px *Paxos) handleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
 	}
 	
 	return nil	
-}
+} 
 
 
 
