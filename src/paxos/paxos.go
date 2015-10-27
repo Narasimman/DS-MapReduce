@@ -44,21 +44,6 @@ const (
 	Forgotten      // decided but forgotten.
 )
 
-type instance struct {
-	MuP sync.Mutex
-	N   int         //instance number
-	V   interface{} //value of this instance
-
-	MuA sync.Mutex
-	N_p int         //highest prepare seen
-	N_a int         //highest accept seen
-	V_a interface{} //value of the highest accept seen
-
-	MuL     sync.RWMutex
-	Decided bool        //boolean that says if the value is decided
-	V_d     interface{} //Decided value
-}
-
 type Paxos struct {
 	mu         sync.Mutex
 	l          net.Listener
@@ -264,9 +249,9 @@ func (px *Paxos) proposer(seq int) {
 	//Now Send Accept
 	DPrintf("Send Accept message..")
 	accReqArgs := &AcceptReqArgs{
-		Seq = seq,
-		N   = ins.N,
-		V   = v_, 
+		Seq : seq,
+		N   : ins.N,
+		V   : v_, 
 	}
 	accResArgs := new(AcceptResArgs)
 	acceptedCount := 0
