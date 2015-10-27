@@ -204,7 +204,7 @@ func (px *Paxos) proposer(seq int) {
 
 	// Send Prepare message.
 	// Construct req and res args
-
+	DPrintf("Send Prepare message...")
 	prepReqArgs := &PrepareReqArgs{
 		Seq:  seq,
 		N:    ins.N,
@@ -260,6 +260,32 @@ func (px *Paxos) proposer(seq int) {
 		go px.proposer(seq)
 		return
 	}
+	
+	//Now Send Accept
+	DPrintf("Send Accept message..")
+	accReqArgs := &AcceptReqArgs{
+		Seq = seq,
+		N   = ins.N,
+		V   = v_, 
+	}
+	accResArgs := new(AcceptResArgs)
+	acceptedCount := 0
+	
+	for i := range px.peers {
+		ok := call(px.peers[i], "Paxos.HandleAccept", accReqArgs, accResArgs)
+		
+		if ok {
+			if accResArgs.OK {
+				acceptedCount++;
+			}
+		}
+	}
+	
+	if !px.isMajority(acceptedCount) {
+		go px.proposer(seq)
+		return
+	}
+	
 }
 
 func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error {
@@ -303,6 +329,35 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error 
 	return nil
 
 }
+
+func (px *Paxos) handleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
+	px.mu.Lock()
+	
+	ins, ok := px.instances[req.Seq]
+	
+	if !ok {
+		ins = new(instance)
+		px.instances[req.Seq] = ins
+	}
+	
+	px.mu.Unlock()
+	
+	ins.MuA.Lock()
+	defer ins.MuA.Unlock()
+	
+	if req.N >= ins.N_p {
+		ins.N_p = req.N
+		ins.N_a = req.N
+		ins.V_a = req.V
+		res.OK = true
+	} else {
+		res.OK = false
+	}
+	
+	return nil	
+}
+
+
 
 //
 // the application on this machine is done with
