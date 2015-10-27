@@ -1,5 +1,7 @@
 package paxos
 
+import "sync"
+
 type instance struct {
 	MuP sync.Mutex
 	N   int         //instance number

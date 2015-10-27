@@ -271,6 +271,21 @@ func (px *Paxos) proposer(seq int) {
 		return
 	}
 	
+	//Now, it's time for send out decision.
+	DPrintf("Send decided value. Consensus has been reached!")
+	decReqArgs := &DecidedReqArgs {
+		Seq : seq,
+		V   : v_,
+	}
+	
+	decResArgs := new(DecidedResArgs)
+	
+	for i := range px.peers {
+		call(px.peers[i], "Paxos.handleDecided", decReqArgs, decResArgs)
+	}
+	
+	
+	
 }
 
 func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error {
@@ -342,7 +357,27 @@ func (px *Paxos) handleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
 	return nil	
 } 
 
-
+func (px *Paxos) handleDecided(req *DecidedReqArgs, res *DecidedResArgs) {
+	px.mu.Lock()
+	
+	ins, ok := px.instances[req.seq]
+	
+	if !ok {
+		ins = new(instance)
+		px.instances[req.seq] = ins
+	}
+	
+	px.mu.Unlock()
+	
+	ins.MuL.Lock()
+	defer ins.MuL.Unlock()
+	
+	ins.Decided = true
+	ins.V_d = req.V
+	
+	return nil
+	
+}
 
 //
 // the application on this machine is done with
@@ -352,6 +387,17 @@ func (px *Paxos) handleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
 //
 func (px *Paxos) Done(seq int) {
 	// Your code here.
+	px.mu.Lock()
+	defer px.mu.Unlock()
+	
+	if px.done < seq {
+		px.done = seq
+		for k := range px.instances {
+			if px.instances[k] <= seq {
+				delete(px.instances, k)
+			}
+ 		}
+	}
 }
 
 //
