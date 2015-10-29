@@ -193,7 +193,7 @@ func (px *Paxos) proposer(seq int) {
 	if ins.N == 0 {
 		ins.N = px.me + 1
 	} else {
-		ins.N = (max_seen/len(px.peers) + 1) * len(px.peers) + px.me + 1
+		ins.N = int(time.Now().UnixNano())*len(px.peers) + px.me
 	}
 
 	// Send Prepare message.
@@ -211,10 +211,16 @@ func (px *Paxos) proposer(seq int) {
 	acceptedPrepare := 0
 	v_ := ins.V
 
+	ok = false
 	for i := range px.peers {
-		ok := call(px.peers[i], "Paxos.HandlePrepare", prepReqArgs, prepResArgs)
-
-		if ok {
+		if i == px.me {
+			px.HandlePrepare(prepReqArgs, prepResArgs)
+		//	ok = true
+		} else {
+			ok = call(px.peers[i], "Paxos.HandlePrepare", prepReqArgs, prepResArgs)
+		}
+		
+	//	if ok {
 			pinged++
 			if prepResArgs.Decided {
 				//Learn the decided value and abort.
@@ -242,14 +248,13 @@ func (px *Paxos) proposer(seq int) {
 				}
 
 			}
-		} //
+	//	} //
 	} // for
 	
-	//if !px.isMajority(acceptedPrepare) {
-	if acceptedPrepare <= (len(px.peers)/2) {
-		if pinged <= (len(px.peers)/2) {
-			time.Sleep(5 * time.Millisecond)
-		}
+	if !px.isMajority(acceptedPrepare) {
+		//if pinged <= (len(px.peers)/2) {
+		//	time.Sleep(5 * time.Millisecond)
+		//}
 		DPrintf("proposer: I did not get any majority. So, I will retry.........")
 		// No majority. So, wait for a while and retry proposing again
 		go px.proposer(seq)
@@ -267,23 +272,26 @@ func (px *Paxos) proposer(seq int) {
 	acceptedCount := 0
 	
 	for i := range px.peers {
-		ok := call(px.peers[i], "Paxos.HandleAccept", accReqArgs, accResArgs)
-		
-		if ok {
+		if i == px.me {
+			px.HandleAccept(accReqArgs, accResArgs)
+	//		ok = true
+		} else {
+			ok = call(px.peers[i], "Paxos.HandleAccept", accReqArgs, accResArgs)
+		}
+	//	if ok {
 			if accResArgs.OK {
 				acceptedCount++;
 			}
-		}
+	//	}
 	}
 	
-	//if !px.isMajority(acceptedCount) {
-	if acceptedCount <= (len(px.peers)/2) {
+	if !px.isMajority(acceptedCount) {
 		go px.proposer(seq)
 		return
 	}
 	
 	//Now, it's time for send out decision.
-	DPrintf("Send decided value. Consensus has been reached!", v_)
+	DPrintf("Send decided value. Consensus has been reached!")
 	decReqArgs := &DecidedReqArgs {
 		Seq : seq,
 		V   : v_,
@@ -292,10 +300,14 @@ func (px *Paxos) proposer(seq int) {
 	decResArgs := new(DecidedResArgs)
 	
 	for i := range px.peers {
-		call(px.peers[i], "Paxos.HandleDecided", decReqArgs, decResArgs)
+		if i == px.me {
+			px.HandleDecided(decReqArgs, decResArgs)			
+		} else {
+			call(px.peers[i], "Paxos.HandleDecided", decReqArgs, decResArgs)
+		}
 	}
 	
-	px.HandleDecided(decReqArgs,decResArgs)
+	//px.HandleDecided(decReqArgs,decResArgs)
 	DPrintf("End of proposer")
 	return
 }
@@ -466,7 +478,7 @@ func (px *Paxos) Min() int {
 		}
 	}
 
-	return min
+	return min + 1
 }
 
 //
