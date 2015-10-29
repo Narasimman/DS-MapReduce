@@ -4,11 +4,14 @@ import "net/rpc"
 import "crypto/rand"
 import "math/big"
 
+import "strconv"
+import "time"
 import "fmt"
 
 type Clerk struct {
 	servers []string
 	// You will have to modify this struct.
+	me string
 }
 
 func nrand() int64 {
@@ -22,6 +25,7 @@ func MakeClerk(servers []string) *Clerk {
 	ck := new(Clerk)
 	ck.servers = servers
 	// You'll have to add code here.
+	ck.me = strconv.FormatInt(nrand(), 10)
 	return ck
 }
 
@@ -66,7 +70,23 @@ func call(srv string, rpcname string,
 //
 func (ck *Clerk) Get(key string) string {
 	// You will have to modify this function.
-	return ""
+	args := &GetArgs{key, nrand(), ck.me}
+	reply := new(GetReply)
+	succeed := false
+	serverIndex := 0
+	
+	for !succeed {
+		succeed = call(ck.servers[serverIndex], "KVPaxos.Get", args, reply)
+		
+		if succeed {
+			return reply.Value
+		} 
+		
+		serverIndex = (serverIndex + 1) % len(ck.servers)
+		time.Sleep(2 * time.Second)		
+	}
+	
+	return reply.Value
 }
 
 //
