@@ -492,7 +492,6 @@ func (px *Paxos) Status(seq int) (Fate, interface{}) {
 	}
 
 	px.mu.Lock()
-
 	ins, ok := px.instances[seq]
 	px.mu.Unlock()
 

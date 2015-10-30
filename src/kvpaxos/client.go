@@ -70,7 +70,12 @@ func call(srv string, rpcname string,
 //
 func (ck *Clerk) Get(key string) string {
 	// You will have to modify this function.
-	args := &GetArgs{key, nrand(), ck.me}
+	args := &GetArgs{
+		Key  : key,
+		UUID : nrand(),
+		Me   : ck.me,
+	}
+
 	reply := new(GetReply)
 	succeed := false
 	serverIndex := 0
@@ -94,6 +99,33 @@ func (ck *Clerk) Get(key string) string {
 //
 func (ck *Clerk) PutAppend(key string, value string, op string) {
 	// You will have to modify this function.
+	
+	args := &PutAppendArgs {
+		Key   : key,
+		Value : value,
+		Op    : op,
+		UUID  : nrand(),
+		Me	  : ck.me,		
+	}
+	
+	reply := new(PutAppendReply)
+	
+	suceed := false
+	serverIndex := 0
+	
+	for !suceed {
+		ok := call(ck.servers[serverIndex], "KVPaxos.PutAppend", args, reply)
+		
+		if ok {
+			return reply.Value
+		
+		}
+		
+		serverIndex = (serverIndex + 1) % len(ck.servers)
+		time.Sleep(2 * time.Second)		
+	}
+	
+	return reply.Value
 }
 
 func (ck *Clerk) Put(key string, value string) {
