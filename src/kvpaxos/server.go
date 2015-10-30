@@ -22,11 +22,20 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 	return
 }
 
+const (
+	GetOp = 1
+	PutOp = 2
+)
 
 type Op struct {
 	// Your definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
+	OpType		int
+	Key			string
+	Value		string
+	UUID			int64
+	Client		string
 }
 
 type KVPaxos struct {
@@ -38,11 +47,29 @@ type KVPaxos struct {
 	px         *paxos.Paxos
 
 	// Your definitions here.
+	content		map[string]string
+	seen			map[string]int64
+	replies		map[string]string
+	completed	int	
 }
 
+func (kv *KVPaxos) requestOperation(req *Op) (bool, string) {
+	
+}
 
 func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
 	// Your code here.
+	kv.mu.Lock()
+	kv.mu.Unlock()
+	
+	reqArgs := &Op {
+		OpType 	: GetOp,
+		Key		: args.Key,
+		UUID		: args.UUID,
+		Client	: args.Me,
+	}
+	
+	
 	
 	return nil
 }
@@ -95,6 +122,10 @@ func StartServer(servers []string, me int) *KVPaxos {
 	kv.me = me
 
 	// Your initialization code here.
+	content = make(map[string]string)
+	seen	 = make(map[string]int64)
+	replies = make(map[string]string)
+	completed = 0
 
 	rpcs := rpc.NewServer()
 	rpcs.Register(kv)
