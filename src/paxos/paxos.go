@@ -503,6 +503,10 @@ func (px *Paxos) Status(seq int) (Fate, interface{}) {
 	ins.MuL.Lock()
 	defer ins.MuL.Unlock()
 
+	if !ins.Decided {
+		return Pending, nil
+	}
+
 	return Decided, ins.V_d
 }
 

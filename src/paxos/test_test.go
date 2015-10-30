@@ -130,7 +130,6 @@ func TestBasic(t *testing.T) {
 	fmt.Printf("Test: Single proposer ...\n")
 
 	pxa[0].Start(0, "hello")
-	DPrintf("after Start in test")
 	waitn(t, pxa, 0, npaxos)
 
 	fmt.Printf("  ... Passed\n")
