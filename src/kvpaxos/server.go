@@ -11,6 +11,7 @@ import "os"
 import "syscall"
 import "encoding/gob"
 import "math/rand"
+import "time"
 
 
 const Debug = 0
@@ -36,6 +37,7 @@ type Op struct {
 	Value		string
 	UUID			int64
 	Client		string
+	Oper			string
 }
 
 type KVPaxos struct {
@@ -55,28 +57,30 @@ type KVPaxos struct {
 
 func (kv *KVPaxos) Apply(op Op, seq int) {
 	value, exists := kv.content[op.Key]
+	
 	if !exists{
 		value = ""
 	}
 	
 	kv.replies[op.Client] = value
 	kv.seen[op.Client] = op.UUID
-	if op.Type == PutOp{
-		if op.OpType == "Append"{
+	if op.OpType == PutOp{
+		if op.Oper == "Append" {
 			kv.content[op.Key] = value + op.Value
-		} else if op.OpType == "Put"{
+		} else if op.Oper == "Put"{
 			kv.content[op.Key] = op.Value
 		}
 	}
-	kv.processed++
-	kv.px.Done(kv.processed)
+	
+	kv.completed++
+	kv.px.Done(kv.completed)
 }
 
 func (kv *KVPaxos) WaitOnAgreement(seq int) Op{
 	to := 10 * time.Millisecond
 	for {
 		decided, val := kv.px.Status(seq)
-		if decided{
+		if decided == paxos.Decided {
 			return val.(Op)
 		}
 		time.Sleep(to)
@@ -90,26 +94,26 @@ func (kv *KVPaxos) requestOperation(req *Op) (bool, string) {
 	var ok = false
 	for !ok {
 		//check seen
-		uuid, exists := kv.seen[op.Client]
-		if exists && uuid == op.UUID {
-			return false, kv.replies[op.Client]
+		uuid, exists := kv.seen[req.Client]
+		if exists && uuid == req.UUID {
+			return false, kv.replies[req.Client]
 		}
-		
-		seq := kv.processed + 1
+
+		seq := kv.completed + 1
 		decided, t := kv.px.Status(seq)
 		var res Op
-		
-		if decided == Decided {
+
+		if decided == paxos.Decided {
 			res = t.(Op)
 		} else {
-			kv.px.Start(seq, op)
-			res = kv.WaitAgreement(seq)
+			kv.px.Start(seq, req)
+			res = kv.WaitOnAgreement(seq)
 		}
-	
-		ok = res.UUID == op.UUID
+
+		ok = res.UUID == req.UUID
 		kv.Apply(res, seq)
 	}
-	return true, kv.replies[op.Client]
+	return true, kv.replies[req.Client]
 }
 
 func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
@@ -124,13 +128,36 @@ func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
 		Client	: args.Me,
 	}
 	
+	success, res := kv.requestOperation(reqArgs)
 	
-	
+	if success {
+		reply.Value = res
+	} else {
+		reply.Err = ErrNoKey
+	}
+		
 	return nil
 }
 
 func (kv *KVPaxos) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	// Your code here.
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+	
+	reqArgs := &Op {
+		OpType	: PutOp,
+		Key		: args.Key,
+		Value	: args.Value,
+		UUID		: args.UUID,
+		Client	: args.Me,
+		Oper		: args.Op,
+	}
+	
+	success, _ := kv.requestOperation(reqArgs)
+	
+	if !success {
+		reply.Err = ErrNoKey
+	}
 	
 	return nil
 }
@@ -177,10 +204,10 @@ func StartServer(servers []string, me int) *KVPaxos {
 	kv.me = me
 
 	// Your initialization code here.
-	content = make(map[string]string)
-	seen	 = make(map[string]int64)
-	replies = make(map[string]string)
-	completed = 0
+	kv.content = make(map[string]string)
+	kv.seen	 = make(map[string]int64)
+	kv.replies = make(map[string]string)
+	kv.completed = 0
 
 	rpcs := rpc.NewServer()
 	rpcs.Register(kv)

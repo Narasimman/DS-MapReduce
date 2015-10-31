@@ -5,6 +5,7 @@ const (
 	ErrNoKey = "ErrNoKey"
 )
 
+type Fate int
 const (
 	Decided   Fate = iota + 1
 	Pending        // not yet decided.
