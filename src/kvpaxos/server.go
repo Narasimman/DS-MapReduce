@@ -57,11 +57,11 @@ type KVPaxos struct {
 
 func (kv *KVPaxos) Apply(op Op, seq int) {
 	value, exists := kv.content[op.Key]
-	
+
 	if !exists{
 		value = ""
 	}
-	
+
 	kv.replies[op.Client] = value
 	kv.seen[op.Client] = op.UUID
 	if op.OpType == PutOp{
@@ -71,7 +71,7 @@ func (kv *KVPaxos) Apply(op Op, seq int) {
 			kv.content[op.Key] = op.Value
 		}
 	}
-	
+
 	kv.completed++
 	kv.px.Done(kv.completed)
 }
@@ -83,8 +83,9 @@ func (kv *KVPaxos) WaitOnAgreement(seq int) Op{
 		if decided == paxos.Decided {
 			return val.(Op)
 		}
+
 		time.Sleep(to)
-		if to < 10 * time.Second{
+		if to < 10 * time.Second {
 			to *= 2
 		}
 	}
@@ -101,8 +102,8 @@ func (kv *KVPaxos) requestOperation(req *Op) (bool, string) {
 
 		seq := kv.completed + 1
 		decided, t := kv.px.Status(seq)
+		
 		var res Op
-
 		if decided == paxos.Decided {
 			res = t.(Op)
 		} else {
@@ -120,14 +121,14 @@ func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
 	// Your code here.
 	kv.mu.Lock()
 	kv.mu.Unlock()
-	
+
 	reqArgs := &Op {
 		OpType 	: GetOp,
 		Key		: args.Key,
 		UUID		: args.UUID,
 		Client	: args.Me,
 	}
-	
+
 	success, res := kv.requestOperation(reqArgs)
 	
 	if success {
