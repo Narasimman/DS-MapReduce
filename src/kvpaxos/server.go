@@ -53,8 +53,63 @@ type KVPaxos struct {
 	completed	int	
 }
 
-func (kv *KVPaxos) requestOperation(req *Op) (bool, string) {
+func (kv *KVPaxos) Apply(op Op, seq int) {
+	value, exists := kv.content[op.Key]
+	if !exists{
+		value = ""
+	}
 	
+	kv.replies[op.Client] = value
+	kv.seen[op.Client] = op.UUID
+	if op.Type == PutOp{
+		if op.OpType == "Append"{
+			kv.content[op.Key] = value + op.Value
+		} else if op.OpType == "Put"{
+			kv.content[op.Key] = op.Value
+		}
+	}
+	kv.processed++
+	kv.px.Done(kv.processed)
+}
+
+func (kv *KVPaxos) WaitOnAgreement(seq int) Op{
+	to := 10 * time.Millisecond
+	for {
+		decided, val := kv.px.Status(seq)
+		if decided{
+			return val.(Op)
+		}
+		time.Sleep(to)
+		if to < 10 * time.Second{
+			to *= 2
+		}
+	}
+}
+
+func (kv *KVPaxos) requestOperation(req *Op) (bool, string) {
+	var ok = false
+	for !ok {
+		//check seen
+		uuid, exists := kv.seen[op.Client]
+		if exists && uuid == op.UUID {
+			return false, kv.replies[op.Client]
+		}
+		
+		seq := kv.processed + 1
+		decided, t := kv.px.Status(seq)
+		var res Op
+		
+		if decided == Decided {
+			res = t.(Op)
+		} else {
+			kv.px.Start(seq, op)
+			res = kv.WaitAgreement(seq)
+		}
+	
+		ok = res.UUID == op.UUID
+		kv.Apply(res, seq)
+	}
+	return true, kv.replies[op.Client]
 }
 
 func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {

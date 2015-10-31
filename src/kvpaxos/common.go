@@ -5,6 +5,12 @@ const (
 	ErrNoKey = "ErrNoKey"
 )
 
+const (
+	Decided   Fate = iota + 1
+	Pending        // not yet decided.
+	Forgotten      // decided but forgotten.
+)
+
 type Err string
 
 // Put or Append
