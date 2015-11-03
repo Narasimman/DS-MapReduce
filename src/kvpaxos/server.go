@@ -102,7 +102,7 @@ func (kv *KVPaxos) requestOperation(req *Op) (bool, string) {
 
 		seq := kv.completed + 1
 		decided, t := kv.px.Status(seq)
-		
+
 		var res Op
 		if decided == paxos.Decided {
 			res = t.(Op)
@@ -111,7 +111,7 @@ func (kv *KVPaxos) requestOperation(req *Op) (bool, string) {
 			res = kv.WaitOnAgreement(seq)
 		}
 
-		ok = res.UUID == req.UUID
+		//ok = res.UUID == req.UUID
 		kv.Apply(res, seq)
 	}
 	return true, kv.replies[req.Client]
@@ -136,8 +136,8 @@ func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
 	} else {
 		reply.Err = ErrNoKey
 	}
-		
-	return nil
+
+		return nil
 }
 
 func (kv *KVPaxos) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
