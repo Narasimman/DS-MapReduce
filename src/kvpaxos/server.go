@@ -14,7 +14,7 @@ import "math/rand"
 import "time"
 
 
-const Debug = 0
+const Debug = 1
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
 	if Debug > 0 {
@@ -78,12 +78,14 @@ func (kv *KVPaxos) Apply(op Op, seq int) {
 
 func (kv *KVPaxos) WaitOnAgreement(seq int) Op{
 	to := 10 * time.Millisecond
+	var res Op
 	for {
 		decided, val := kv.px.Status(seq)
 		if decided == paxos.Decided {
-			return val.(Op)
+			res = val.(Op)
+			return res
 		}
-
+		
 		time.Sleep(to)
 		if to < 10 * time.Second {
 			to *= 2
@@ -91,7 +93,7 @@ func (kv *KVPaxos) WaitOnAgreement(seq int) Op{
 	}
 }
 
-func (kv *KVPaxos) requestOperation(req *Op) (bool, string) {
+func (kv *KVPaxos) requestOperation(req Op) (bool, string) {
 	var ok = false
 	for !ok {
 		//check seen
@@ -111,7 +113,7 @@ func (kv *KVPaxos) requestOperation(req *Op) (bool, string) {
 			res = kv.WaitOnAgreement(seq)
 		}
 
-		//ok = res.UUID == req.UUID
+		ok = res.UUID == req.UUID
 		kv.Apply(res, seq)
 	}
 	return true, kv.replies[req.Client]
@@ -122,7 +124,7 @@ func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
 	kv.mu.Lock()
 	kv.mu.Unlock()
 
-	reqArgs := &Op {
+	reqArgs := Op {
 		OpType 	: GetOp,
 		Key		: args.Key,
 		UUID		: args.UUID,
@@ -145,7 +147,7 @@ func (kv *KVPaxos) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 	
-	reqArgs := &Op {
+	reqArgs := Op {
 		OpType	: PutOp,
 		Key		: args.Key,
 		Value	: args.Value,

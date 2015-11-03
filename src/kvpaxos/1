@@ -1,0 +1,201 @@
+2015/11/02 20:14:06 method Apply reply type not a pointer: int
+2015/11/02 20:14:06 method WaitOnAgreement has wrong number of ins: 2
+2015/11/02 20:14:06 method Done has wrong number of ins: 2
+2015/11/02 20:14:06 method Kill has wrong number of ins: 1
+2015/11/02 20:14:06 method Max has wrong number of ins: 1
+2015/11/02 20:14:06 method Min has wrong number of ins: 1
+2015/11/02 20:14:06 method Start reply type not a pointer: interface {}
+2015/11/02 20:14:06 method Status has wrong number of ins: 2
+2015/11/02 20:14:06 method Apply reply type not a pointer: int
+2015/11/02 20:14:06 method WaitOnAgreement has wrong number of ins: 2
+2015/11/02 20:14:06 method Done has wrong number of ins: 2
+2015/11/02 20:14:06 method Kill has wrong number of ins: 1
+2015/11/02 20:14:06 method Max has wrong number of ins: 1
+2015/11/02 20:14:06 method Min has wrong number of ins: 1
+2015/11/02 20:14:06 method Start reply type not a pointer: interface {}
+2015/11/02 20:14:06 method Status has wrong number of ins: 2
+2015/11/02 20:14:06 method Apply reply type not a pointer: int
+2015/11/02 20:14:06 method WaitOnAgreement has wrong number of ins: 2
+2015/11/02 20:14:06 method Done has wrong number of ins: 2
+2015/11/02 20:14:06 method Kill has wrong number of ins: 1
+2015/11/02 20:14:06 method Max has wrong number of ins: 1
+2015/11/02 20:14:06 method Min has wrong number of ins: 1
+2015/11/02 20:14:06 method Start reply type not a pointer: interface {}
+2015/11/02 20:14:06 method Status has wrong number of ins: 2
+panic: interface conversion: interface {} is kvpaxos.Op, not *kvpaxos.Op
+
+goroutine 110 [running]:
+kvpaxos.(*KVPaxos).WaitOnAgreement(0xc820012d20, 0x6, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, ...)
+	/home/stud/DS-MapReduce/src/kvpaxos/server.go:86 +0xe3
+kvpaxos.(*KVPaxos).requestOperation(0xc820012d20, 0xc820176a00, 0xc8202d1f38, 0x0, 0x0)
+	/home/stud/DS-MapReduce/src/kvpaxos/server.go:115 +0x2f5
+kvpaxos.(*KVPaxos).Get(0xc820012d20, 0xc8202d1f20, 0xc820362720, 0x0, 0x0)
+	/home/stud/DS-MapReduce/src/kvpaxos/server.go:136 +0x111
+reflect.Value.call(0x7acc60, 0x832e50, 0x13, 0x8600c8, 0x4, 0xc82003fef8, 0x3, 0x3, 0x0, 0x0, ...)
+	/usr/local/go/src/reflect/value.go:432 +0x120a
+reflect.Value.Call(0x7acc60, 0x832e50, 0x13, 0xc82003fef8, 0x3, 0x3, 0x0, 0x0, 0x0)
+	/usr/local/go/src/reflect/value.go:300 +0xb1
+net/rpc.(*service).call(0xc8200fe0c0, 0xc8200fe080, 0xc8202d55a0, 0xc820088a00, 0xc8203620e0, 0x71c0e0, 0xc8202d1f20, 0x16, 0x71c140, 0xc820362720, ...)
+	/usr/local/go/src/net/rpc/server.go:383 +0x1c1
+created by net/rpc.(*Server).ServeCodec
+	/usr/local/go/src/net/rpc/server.go:477 +0x4ac
+
+goroutine 1 [chan receive]:
+testing.RunTests(0x91d240, 0xa71a60, 0x6, 0x6, 0xa79701)
+	/usr/local/go/src/testing/testing.go:562 +0x8ad
+testing.(*M).Run(0xc8200dbee8, 0xc820019940)
+	/usr/local/go/src/testing/testing.go:494 +0x70
+main.main()
+	kvpaxos/_test/_testmain.go:64 +0x116
+
+goroutine 17 [syscall, locked to thread]:
+runtime.goexit()
+	/usr/local/go/src/runtime/asm_amd64.s:1696 +0x1
+
+goroutine 6 [chan receive]:
+net/rpc.(*Client).Call(0xc820277980, 0x86b9b0, 0xb, 0x71c0e0, 0xc8202d1740, 0x71c140, 0xc82028bfe0, 0x0, 0x0)
+	/usr/local/go/src/net/rpc/client.go:315 +0xcd
+kvpaxos.call(0xc8200dc210, 0x21, 0x86b9b0, 0xb, 0x71c0e0, 0xc8202d1740, 0x71c140, 0xc82028bfe0, 0x483500)
+	/home/stud/DS-MapReduce/src/kvpaxos/client.go:57 +0x116
+kvpaxos.(*Clerk).Get(0xc8200dce40, 0x862518, 0x1, 0x0, 0x0)
+	/home/stud/DS-MapReduce/src/kvpaxos/client.go:84 +0x19e
+kvpaxos.check(0xc82001e480, 0xc8200dce40, 0x862518, 0x1, 0x862550, 0x3)
+	/home/stud/DS-MapReduce/src/kvpaxos/test_test.go:14 +0x4a
+kvpaxos.TestBasic(0xc82001e480)
+	/home/stud/DS-MapReduce/src/kvpaxos/test_test.go:76 +0x542
+testing.tRunner(0xc82001e480, 0xa71a60)
+	/usr/local/go/src/testing/testing.go:456 +0x98
+created by testing.RunTests
+	/usr/local/go/src/testing/testing.go:561 +0x86d
+
+goroutine 7 [IO wait]:
+net.runtime_pollWait(0x7f41896cdb70, 0x72, 0xc82000a210)
+	/usr/local/go/src/runtime/netpoll.go:157 +0x60
+net.(*pollDesc).Wait(0xc82001c300, 0x72, 0x0, 0x0)
+	/usr/local/go/src/net/fd_poll_runtime.go:73 +0x3a
+net.(*pollDesc).WaitRead(0xc82001c300, 0x0, 0x0)
+	/usr/local/go/src/net/fd_poll_runtime.go:78 +0x36
+net.(*netFD).accept(0xc82001c2a0, 0x0, 0x7f41896cdc80, 0xc82018d220)
+	/usr/local/go/src/net/fd_unix.go:408 +0x27c
+net.(*UnixListener).AcceptUnix(0xc82000f540, 0xc82003aea8, 0x0, 0x0)
+	/usr/local/go/src/net/unixsock_posix.go:304 +0x53
+net.(*UnixListener).Accept(0xc82000f540, 0x0, 0x0, 0x0, 0x0)
+	/usr/local/go/src/net/unixsock_posix.go:314 +0x41
+kvpaxos.StartServer.func1(0xc820012be0, 0xc820019cc0, 0x0)
+	/home/stud/DS-MapReduce/src/kvpaxos/server.go:235 +0xa3
+created by kvpaxos.StartServer
+	/home/stud/DS-MapReduce/src/kvpaxos/server.go:260 +0x532
+
+goroutine 8 [IO wait]:
+net.runtime_pollWait(0x7f41896cdab0, 0x72, 0xc82000a210)
+	/usr/local/go/src/runtime/netpoll.go:157 +0x60
+net.(*pollDesc).Wait(0xc82001c3e0, 0x72, 0x0, 0x0)
+	/usr/local/go/src/net/fd_poll_runtime.go:73 +0x3a
+net.(*pollDesc).WaitRead(0xc82001c3e0, 0x0, 0x0)
+	/usr/local/go/src/net/fd_poll_runtime.go:78 +0x36
+net.(*netFD).accept(0xc82001c380, 0x0, 0x7f41896cdc80, 0xc820314dc0)
+	/usr/local/go/src/net/fd_unix.go:408 +0x27c
+net.(*UnixListener).AcceptUnix(0xc82000f5a0, 0xc82015aea8, 0x0, 0x0)
+	/usr/local/go/src/net/unixsock_posix.go:304 +0x53
+net.(*UnixListener).Accept(0xc82000f5a0, 0x0, 0x0, 0x0, 0x0)
+	/usr/local/go/src/net/unixsock_posix.go:314 +0x41
+kvpaxos.StartServer.func1(0xc820012c80, 0xc820019f40, 0x1)
+	/home/stud/DS-MapReduce/src/kvpaxos/server.go:235 +0xa3
+created by kvpaxos.StartServer
+	/home/stud/DS-MapReduce/src/kvpaxos/server.go:260 +0x532
+
+goroutine 9 [IO wait]:
+net.runtime_pollWait(0x7f41896cd9f0, 0x72, 0xc82000a210)
+	/usr/local/go/src/runtime/netpoll.go:157 +0x60
+net.(*pollDesc).Wait(0xc82001c4c0, 0x72, 0x0, 0x0)
+	/usr/local/go/src/net/fd_poll_runtime.go:73 +0x3a
+net.(*pollDesc).WaitRead(0xc82001c4c0, 0x0, 0x0)
+	/usr/local/go/src/net/fd_poll_runtime.go:78 +0x36
+net.(*netFD).accept(0xc82001c460, 0x0, 0x7f41896cdc80, 0xc8203620c0)
+	/usr/local/go/src/net/fd_unix.go:408 +0x27c
+net.(*UnixListener).AcceptUnix(0xc82000f600, 0xc82015bea8, 0x0, 0x0)
+	/usr/local/go/src/net/unixsock_posix.go:304 +0x53
+net.(*UnixListener).Accept(0xc82000f600, 0x0, 0x0, 0x0, 0x0)
+	/usr/local/go/src/net/unixsock_posix.go:314 +0x41
+kvpaxos.StartServer.func1(0xc820012d20, 0xc8200fe080, 0x2)
+	/home/stud/DS-MapReduce/src/kvpaxos/server.go:235 +0xa3
+created by kvpaxos.StartServer
+	/home/stud/DS-MapReduce/src/kvpaxos/server.go:260 +0x532
+
+goroutine 109 [IO wait]:
+net.runtime_pollWait(0x7f41896cd7b0, 0x72, 0xc82000a210)
+	/usr/local/go/src/runtime/netpoll.go:157 +0x60
+net.(*pollDesc).Wait(0xc82028fa30, 0x72, 0x0, 0x0)
+	/usr/local/go/src/net/fd_poll_runtime.go:73 +0x3a
+net.(*pollDesc).WaitRead(0xc82028fa30, 0x0, 0x0)
+	/usr/local/go/src/net/fd_poll_runtime.go:78 +0x36
+net.(*netFD).Read(0xc82028f9d0, 0xc820367000, 0x1000, 0x1000, 0x0, 0x7f41896c8050, 0xc82000a210)
+	/usr/local/go/src/net/fd_unix.go:232 +0x23a
+net.(*conn).Read(0xc82016f4d0, 0xc820367000, 0x1000, 0x1000, 0x0, 0x0, 0x0)
+	/usr/local/go/src/net/net.go:172 +0xe4
+bufio.(*Reader).fill(0xc820277a40)
+	/usr/local/go/src/bufio/bufio.go:97 +0x1e9
+bufio.(*Reader).Read(0xc820277a40, 0xc8202d5580, 0x1, 0x9, 0x0, 0x0, 0x0)
+	/usr/local/go/src/bufio/bufio.go:207 +0x260
+io.ReadAtLeast(0x7f41896cdc58, 0xc820277a40, 0xc8202d5580, 0x1, 0x9, 0x1, 0x0, 0x0, 0x0)
+	/usr/local/go/src/io/io.go:298 +0xe6
+io.ReadFull(0x7f41896cdc58, 0xc820277a40, 0xc8202d5580, 0x1, 0x9, 0xc820206b40, 0x0, 0x0)
+	/usr/local/go/src/io/io.go:316 +0x62
+encoding/gob.decodeUintReader(0x7f41896cdc58, 0xc820277a40, 0xc8202d5580, 0x9, 0x9, 0x0, 0x1, 0x0, 0x0)
+	/usr/local/go/src/encoding/gob/decode.go:121 +0x92
+encoding/gob.(*Decoder).recvMessage(0xc820283200, 0xc820125940)
+	/usr/local/go/src/encoding/gob/decoder.go:76 +0x5e
+encoding/gob.(*Decoder).decodeTypeSequence(0xc820283200, 0x91d900, 0xc820283200)
+	/usr/local/go/src/encoding/gob/decoder.go:140 +0x47
+encoding/gob.(*Decoder).DecodeValue(0xc820283200, 0x71fb60, 0xc820362740, 0x16, 0x0, 0x0)
+	/usr/local/go/src/encoding/gob/decoder.go:208 +0x15d
+encoding/gob.(*Decoder).Decode(0xc820283200, 0x71fb60, 0xc820362740, 0x0, 0x0)
+	/usr/local/go/src/encoding/gob/decoder.go:185 +0x289
+net/rpc.(*gobServerCodec).ReadRequestHeader(0xc8202d19e0, 0xc820362740, 0x0, 0x0)
+	/usr/local/go/src/net/rpc/server.go:403 +0x51
+net/rpc.(*Server).readRequestHeader(0xc8200fe080, 0x7f41880780d8, 0xc8202d19e0, 0x0, 0x0, 0xc820362740, 0xc820125c00, 0x0, 0x0)
+	/usr/local/go/src/net/rpc/server.go:576 +0x90
+net/rpc.(*Server).readRequest(0xc8200fe080, 0x7f41880780d8, 0xc8202d19e0, 0xc8200fe080, 0xc8202d55a0, 0xc820088a00, 0x0, 0x0, 0x0, 0x0, ...)
+	/usr/local/go/src/net/rpc/server.go:543 +0x8b
+net/rpc.(*Server).ServeCodec(0xc8200fe080, 0x7f41880780d8, 0xc8202d19e0)
+	/usr/local/go/src/net/rpc/server.go:462 +0x8c
+net/rpc.(*Server).ServeConn(0xc8200fe080, 0x7f4188078000, 0xc82016f4d0)
+	/usr/local/go/src/net/rpc/server.go:454 +0x4ee
+created by kvpaxos.StartServer.func1
+	/home/stud/DS-MapReduce/src/kvpaxos/server.go:250 +0x639
+
+goroutine 108 [IO wait]:
+net.runtime_pollWait(0x7f41896cd570, 0x72, 0xc82000a210)
+	/usr/local/go/src/runtime/netpoll.go:157 +0x60
+net.(*pollDesc).Wait(0xc82028f9c0, 0x72, 0x0, 0x0)
+	/usr/local/go/src/net/fd_poll_runtime.go:73 +0x3a
+net.(*pollDesc).WaitRead(0xc82028f9c0, 0x0, 0x0)
+	/usr/local/go/src/net/fd_poll_runtime.go:78 +0x36
+net.(*netFD).Read(0xc82028f960, 0xc820365000, 0x1000, 0x1000, 0x0, 0x7f41896c8050, 0xc82000a210)
+	/usr/local/go/src/net/fd_unix.go:232 +0x23a
+net.(*conn).Read(0xc82016f4c0, 0xc820365000, 0x1000, 0x1000, 0x0, 0x0, 0x0)
+	/usr/local/go/src/net/net.go:172 +0xe4
+bufio.(*Reader).fill(0xc8202778c0)
+	/usr/local/go/src/bufio/bufio.go:97 +0x1e9
+bufio.(*Reader).Read(0xc8202778c0, 0xc8202d5490, 0x1, 0x9, 0x5bb979, 0x0, 0x0)
+	/usr/local/go/src/bufio/bufio.go:207 +0x260
+io.ReadAtLeast(0x7f41896cdc58, 0xc8202778c0, 0xc8202d5490, 0x1, 0x9, 0x1, 0x0, 0x0, 0x0)
+	/usr/local/go/src/io/io.go:298 +0xe6
+io.ReadFull(0x7f41896cdc58, 0xc8202778c0, 0xc8202d5490, 0x1, 0x9, 0x71fb60, 0x0, 0x0)
+	/usr/local/go/src/io/io.go:316 +0x62
+encoding/gob.decodeUintReader(0x7f41896cdc58, 0xc8202778c0, 0xc8202d5490, 0x9, 0x9, 0x0, 0x1, 0x0, 0x0)
+	/usr/local/go/src/encoding/gob/decode.go:121 +0x92
+encoding/gob.(*Decoder).recvMessage(0xc820283080, 0xc8201b6bf0)
+	/usr/local/go/src/encoding/gob/decoder.go:76 +0x5e
+encoding/gob.(*Decoder).decodeTypeSequence(0xc820283080, 0x91d900, 0xc820283080)
+	/usr/local/go/src/encoding/gob/decoder.go:140 +0x47
+encoding/gob.(*Decoder).DecodeValue(0xc820283080, 0x71fbc0, 0xc8202d18c0, 0x16, 0x0, 0x0)
+	/usr/local/go/src/encoding/gob/decoder.go:208 +0x15d
+encoding/gob.(*Decoder).Decode(0xc820283080, 0x71fbc0, 0xc8202d18c0, 0x0, 0x0)
+	/usr/local/go/src/encoding/gob/decoder.go:185 +0x289
+net/rpc.(*gobClientCodec).ReadResponseHeader(0xc8202d1860, 0xc8202d18c0, 0x0, 0x0)
+	/usr/local/go/src/net/rpc/client.go:223 +0x51
+net/rpc.(*Client).input(0xc820277980)
+	/usr/local/go/src/net/rpc/client.go:109 +0xbf
+created by net/rpc.NewClientWithCodec
+	/usr/local/go/src/net/rpc/client.go:201 +0xd2
