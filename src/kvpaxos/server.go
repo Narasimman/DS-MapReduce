@@ -14,7 +14,7 @@ import "math/rand"
 import "time"
 
 
-const Debug = 1
+const Debug = 0
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
 	if Debug > 0 {
@@ -122,7 +122,7 @@ func (kv *KVPaxos) requestOperation(req Op) (bool, string) {
 func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
 	// Your code here.
 	kv.mu.Lock()
-	kv.mu.Unlock()
+	defer kv.mu.Unlock()
 
 	reqArgs := Op {
 		OpType 	: GetOp,
