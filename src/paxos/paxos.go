@@ -61,7 +61,7 @@ type Paxos struct {
 }
 
 // Debugging
-const Debug = 1
+const Debug = 0
 
 func DPrintf(a ...interface{}) (n int, err error) {
 	if Debug > 0 {
@@ -114,8 +114,6 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 // is reached.
 //
 func (px *Paxos) Start(seq int, v interface{}) {
-	// Your code here.
-
 	DPrintf("Start: Application starts on Paxos agreement")
 	min := px.Min()
 	px.mu.Lock()
@@ -166,7 +164,6 @@ func (px *Paxos) isMajority(counter int) bool {
 }
 
 func (px *Paxos) proposer(seq int) {
-
 	DPrintf("Proposer: start proposer")
 
 	px.mu.Lock()
@@ -215,6 +212,7 @@ func (px *Paxos) proposer(seq int) {
 	for i := range px.peers {
 		if i == px.me {
 			px.HandlePrepare(prepReqArgs, prepResArgs)
+			pinged++
 		} else {
 			ok = call(px.peers[i], "Paxos.HandlePrepare", prepReqArgs, prepResArgs)
 			if ok {
@@ -304,11 +302,11 @@ func (px *Paxos) proposer(seq int) {
 		}
 	}
 
-	//px.HandleDecided(decReqArgs,decResArgs)
 	DPrintf("End of proposer")
 	return
 }
 
+// Handle the prepare request
 func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error {
 	px.mu.Lock()
 
@@ -325,6 +323,7 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error 
 
 	// Learn  the decided value
 	ins.MuL.RLock()
+
 	if ins.Decided {
 		DPrintf("PrepareHandler: respond decided value : ")
 		res.V_a = ins.V_d
@@ -348,9 +347,9 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error 
 	}
 
 	return nil
-
 }
 
+// Handle the accept request
 func (px *Paxos) HandleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
 	px.mu.Lock()
 	ins, ok := px.instances[req.Seq]
@@ -376,6 +375,7 @@ func (px *Paxos) HandleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
 	return nil
 }
 
+// Handle the decided request by setting the V_d value
 func (px *Paxos) HandleDecided(req *DecidedReqArgs, res *DecidedResArgs) error {
 	DPrintf("Handle decided value")
 
@@ -387,6 +387,7 @@ func (px *Paxos) HandleDecided(req *DecidedReqArgs, res *DecidedResArgs) error {
 		ins = new(instance)
 		px.instances[req.Seq] = ins
 	}
+
 	px.mu.Unlock()
 
 	ins.MuL.Lock()
@@ -396,7 +397,6 @@ func (px *Paxos) HandleDecided(req *DecidedReqArgs, res *DecidedResArgs) error {
 	ins.V_d = req.V
 
 	return nil
-
 }
 
 //
@@ -406,7 +406,6 @@ func (px *Paxos) HandleDecided(req *DecidedReqArgs, res *DecidedResArgs) error {
 // see the comments for Min() for more explanation.
 //
 func (px *Paxos) Done(seq int) {
-	// Your code here.
 	px.mu.Lock()
 	defer px.mu.Unlock()
 
@@ -426,7 +425,6 @@ func (px *Paxos) Done(seq int) {
 // this peer.
 //
 func (px *Paxos) Max() int {
-	// Your code here.
 	px.mu.Lock()
 	defer px.mu.Unlock()
 
@@ -462,7 +460,6 @@ func (px *Paxos) Max() int {
 // instances.
 //
 func (px *Paxos) Min() int {
-	// You code here.
 	px.mu.Lock()
 	defer px.mu.Unlock()
 
@@ -485,8 +482,6 @@ func (px *Paxos) Min() int {
 // it should not contact other Paxos peers.
 //
 func (px *Paxos) Status(seq int) (Fate, interface{}) {
-	// Your code here.
-
 	if seq < px.Min() {
 		return Forgotten, nil
 	}

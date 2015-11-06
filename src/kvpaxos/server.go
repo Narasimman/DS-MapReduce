@@ -85,7 +85,7 @@ func (kv *KVPaxos) WaitOnAgreement(seq int) Op{
 			res = val.(Op)
 			return res
 		}
-		
+
 		time.Sleep(to)
 		if to < 10 * time.Second {
 			to *= 2
@@ -120,7 +120,6 @@ func (kv *KVPaxos) requestOperation(req Op) (bool, string) {
 }
 
 func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
-	// Your code here.
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
@@ -135,18 +134,14 @@ func (kv *KVPaxos) Get(args *GetArgs, reply *GetReply) error {
 	
 	if success {
 		reply.Value = res
-	} else {
-		reply.Err = ErrNoKey
 	}
-
 		return nil
 }
 
 func (kv *KVPaxos) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
-	// Your code here.
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
-	
+
 	reqArgs := Op {
 		OpType	: PutOp,
 		Key		: args.Key,
@@ -155,13 +150,12 @@ func (kv *KVPaxos) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 		Client	: args.Me,
 		Oper		: args.Op,
 	}
-	
+
 	success, _ := kv.requestOperation(reqArgs)
-	
-	if !success {
-		reply.Err = ErrNoKey
-	}
-	
+
+	if success {
+		
+	}	
 	return nil
 }
 

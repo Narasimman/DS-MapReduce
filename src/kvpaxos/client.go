@@ -98,8 +98,6 @@ func (ck *Clerk) Get(key string) string {
 // shared by Put and Append.
 //
 func (ck *Clerk) PutAppend(key string, value string, op string) string {
-	// You will have to modify this function.
-	
 	args := &PutAppendArgs {
 		Key   : key,
 		Value : value,
