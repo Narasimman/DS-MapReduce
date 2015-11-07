@@ -115,9 +115,9 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 //
 func (px *Paxos) Start(seq int, v interface{}) {
 	DPrintf("Start: Application starts on Paxos agreement")
-	min := px.Min()
 	px.mu.Lock()
-
+	min := px.Min()
+	
 	if seq < min {
 		DPrintf("Start: ignore seq less than the min (forgotten)")
 		px.mu.Unlock()
@@ -160,7 +160,7 @@ func (px *Paxos) Start(seq int, v interface{}) {
 }
 
 func (px *Paxos) isMajority(counter int) bool {
-	return (counter > (len(px.peers) / 2))
+	return (counter > (len(px.peers) / 2) + 1)
 }
 
 func (px *Paxos) proposer(seq int) {
@@ -169,7 +169,6 @@ func (px *Paxos) proposer(seq int) {
 	px.mu.Lock()
 	ins, ok := px.instances[seq]
 
-	done := px.done
 	me := px.me
 
 	px.mu.Unlock()
@@ -186,19 +185,14 @@ func (px *Paxos) proposer(seq int) {
 	defer ins.MuP.Unlock()
 
 	// We need unique N here
-	if ins.N == 0 {
-		ins.N = px.me + 1
-	} else {
-		ins.N = int(time.Now().UnixNano())*len(px.peers) + px.me
-	}
-
+	ins.N = int(time.Now().UnixNano())*len(px.peers) + px.me
+	
 	// Send Prepare message.
 	// Construct req and res args
 	DPrintf("Send Prepare message...")
 	prepReqArgs := &PrepareReqArgs{
 		Seq:  seq,
 		N:    ins.N,
-		Done: done,
 		Me:   me,
 	}
 
@@ -212,16 +206,23 @@ func (px *Paxos) proposer(seq int) {
 	for i := range px.peers {
 		if i == px.me {
 			px.HandlePrepare(prepReqArgs, prepResArgs)
-			pinged++
+			if prepResArgs.OK {
+				pinged++
+			}
 		} else {
 			ok = call(px.peers[i], "Paxos.HandlePrepare", prepReqArgs, prepResArgs)
 			if ok {
-				pinged++
+				pinged++				
 			}
 		}
+		
+		if px.dones[i] < prepResArgs.Done {
+			px.dones[i] = prepResArgs.Done
+		}
+		
 
 		if prepResArgs.Decided {
-			//Learn the decided value and abort.
+			// Learn the decided value and abort.
 			// Because the value sent by this proposer was different from the
 			// value that was decided by consensus.
 			ins.MuL.RLock()
@@ -239,17 +240,14 @@ func (px *Paxos) proposer(seq int) {
 
 			if prepResArgs.N_a > max_seen {
 				max_seen = prepResArgs.N_a
-
-				if prepResArgs.V_a != nil {
-					v_ = prepResArgs.V_a
-				}
+				v_ = prepResArgs.V_a
 			}
 
 		}
 	} // for
 
 	if !px.isMajority(acceptedPrepare) {
-		if pinged <= (len(px.peers) / 2) {
+		if pinged < (len(px.peers) / 2) + 1 {
 			time.Sleep(5 * time.Millisecond)
 		}
 
@@ -278,9 +276,15 @@ func (px *Paxos) proposer(seq int) {
 		if accResArgs.OK {
 			acceptedCount++
 		}
+		
+		if px.dones[i] < accResArgs.Done {
+			px.dones[i] = accResArgs.Done
+		}
+		
 	}
 
 	if !px.isMajority(acceptedCount) {
+		time.Sleep(5 * time.Millisecond)
 		go px.proposer(seq)
 		return
 	}
@@ -290,6 +294,8 @@ func (px *Paxos) proposer(seq int) {
 	decReqArgs := &DecidedReqArgs{
 		Seq: seq,
 		V:   v_,
+		DoneMe: px.me,
+		Done: px.dones[px.me],
 	}
 
 	decResArgs := new(DecidedResArgs)
@@ -300,6 +306,11 @@ func (px *Paxos) proposer(seq int) {
 		} else {
 			call(px.peers[i], "Paxos.HandleDecided", decReqArgs, decResArgs)
 		}
+		
+		if px.dones[i] < decResArgs.Done {
+			px.dones[i] = decResArgs.Done
+		}
+		
 	}
 
 	DPrintf("End of proposer")
@@ -317,7 +328,7 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error 
 		px.instances[req.Seq] = ins
 	}
 
-	px.dones[req.Me] = req.Done
+	res.Done = px.dones[px.me]
 
 	px.mu.Unlock()
 
@@ -358,6 +369,9 @@ func (px *Paxos) HandleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
 		ins = new(instance)
 		px.instances[req.Seq] = ins
 	}
+	
+	res.Done = px.dones[px.me]
+	
 	px.mu.Unlock()
 
 	ins.MuA.Lock()
@@ -387,7 +401,10 @@ func (px *Paxos) HandleDecided(req *DecidedReqArgs, res *DecidedResArgs) error {
 		ins = new(instance)
 		px.instances[req.Seq] = ins
 	}
-
+	
+	px.dones[req.DoneMe] = req.Done
+	res.Done = px.dones[px.me]
+	
 	px.mu.Unlock()
 
 	ins.MuL.Lock()
@@ -411,6 +428,7 @@ func (px *Paxos) Done(seq int) {
 
 	if px.done < seq {
 		px.done = seq
+		px.dones[px.me] = seq
 		for k := range px.instances {
 			if k <= seq {
 				delete(px.instances, k)
@@ -460,9 +478,6 @@ func (px *Paxos) Max() int {
 // instances.
 //
 func (px *Paxos) Min() int {
-	px.mu.Lock()
-	defer px.mu.Unlock()
-
 	min := int(^uint(0) >> 1)
 
 	for i := range px.dones {
@@ -470,7 +485,6 @@ func (px *Paxos) Min() int {
 			min = px.dones[i]
 		}
 	}
-
 	return min + 1
 }
 

@@ -48,7 +48,6 @@ type KVPaxos struct {
 	unreliable int32 // for testing
 	px         *paxos.Paxos
 
-	// Your definitions here.
 	content		map[string]string
 	seen			map[string]int64
 	replies		map[string]string
@@ -102,7 +101,7 @@ func (kv *KVPaxos) requestOperation(req Op) (bool, string) {
 			return false, kv.replies[req.Client]
 		}
 
-		seq := kv.completed + 1
+		seq := kv.px.Max() + 1
 		decided, t := kv.px.Status(seq)
 
 		var res Op
@@ -113,7 +112,10 @@ func (kv *KVPaxos) requestOperation(req Op) (bool, string) {
 			res = kv.WaitOnAgreement(seq)
 		}
 
-		ok = res.UUID == req.UUID
+		if res.UUID == req.UUID {
+			ok = true
+		}
+		
 		kv.Apply(res, seq)
 	}
 	return true, kv.replies[req.Client]
@@ -200,7 +202,6 @@ func StartServer(servers []string, me int) *KVPaxos {
 	kv := new(KVPaxos)
 	kv.me = me
 
-	// Your initialization code here.
 	kv.content = make(map[string]string)
 	kv.seen	 = make(map[string]int64)
 	kv.replies = make(map[string]string)

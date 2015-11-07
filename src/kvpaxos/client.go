@@ -69,7 +69,6 @@ func call(srv string, rpcname string,
 // keeps trying forever in the face of all other errors.
 //
 func (ck *Clerk) Get(key string) string {
-	// You will have to modify this function.
 	args := &GetArgs{
 		Key  : key,
 		UUID : nrand(),
@@ -115,14 +114,12 @@ func (ck *Clerk) PutAppend(key string, value string, op string) string {
 		ok := call(ck.servers[serverIndex], "KVPaxos.PutAppend", args, reply)
 		
 		if ok {
-			return reply.Value
-		
+			return reply.Value		
 		}
 		
 		serverIndex = (serverIndex + 1) % len(ck.servers)
 		time.Sleep(2 * time.Second)		
-	}
-	
+	}	
 	return reply.Value
 }
 
