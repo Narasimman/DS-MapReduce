@@ -61,7 +61,7 @@ type Paxos struct {
 }
 
 // Debugging
-const Debug = 0
+const Debug = 1
 
 func DPrintf(a ...interface{}) (n int, err error) {
 	if Debug > 0 {
@@ -114,7 +114,8 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 // is reached.
 //
 func (px *Paxos) Start(seq int, v interface{}) {
-	DPrintf("Start: Application starts on Paxos agreement")
+	DPrintf("Start: Application starts on Paxos agreement : " )
+	fmt.Println(seq)
 	px.mu.Lock()
 	min := px.Min()
 	
@@ -130,6 +131,9 @@ func (px *Paxos) Start(seq int, v interface{}) {
 		DPrintf("Start: instance not found")
 		//if instance is not present already, create one
 		ins = new(instance)
+		ins.Decided = false
+		ins.N_p = -1
+		ins.N_p = -1
 		px.instances[seq] = ins
 	}
 
@@ -155,7 +159,9 @@ func (px *Paxos) Start(seq int, v interface{}) {
 	ins.MuP.Unlock()
 
 	DPrintf("start: calling proposer")
+	px.mu.Lock()
 	go px.proposer(seq)
+	px.mu.Unlock()
 	DPrintf("Start: End of start")
 }
 
@@ -170,10 +176,13 @@ func (px *Paxos) proposer(seq int) {
 	ins, ok := px.instances[seq]
 
 	me := px.me
+	dones := px.dones
+	peers := px.peers
 
 	px.mu.Unlock()
 
 	if !ok {
+		DPrintf("proposer: Instance not found")
 		return
 	}
 
@@ -185,7 +194,7 @@ func (px *Paxos) proposer(seq int) {
 	defer ins.MuP.Unlock()
 
 	// We need unique N here
-	ins.N = int(time.Now().UnixNano())*len(px.peers) + px.me
+	ins.N = int(time.Now().UnixNano())*len(px.peers) + me
 	
 	// Send Prepare message.
 	// Construct req and res args
@@ -203,21 +212,21 @@ func (px *Paxos) proposer(seq int) {
 	v_ := ins.V
 
 	ok = false
-	for i := range px.peers {
-		if i == px.me {
+	for i := range peers {
+		if i == me {
 			px.HandlePrepare(prepReqArgs, prepResArgs)
 			if prepResArgs.OK {
 				pinged++
 			}
 		} else {
-			ok = call(px.peers[i], "Paxos.HandlePrepare", prepReqArgs, prepResArgs)
+			ok = call(peers[i], "Paxos.HandlePrepare", prepReqArgs, prepResArgs)
 			if ok {
 				pinged++				
 			}
 		}
 		
-		if px.dones[i] < prepResArgs.Done {
-			px.dones[i] = prepResArgs.Done
+		if dones[i] < prepResArgs.Done {
+			dones[i] = prepResArgs.Done
 		}
 		
 
@@ -232,7 +241,6 @@ func (px *Paxos) proposer(seq int) {
 			ins.V_d = prepResArgs.V_a
 
 			return
-
 		}
 
 		if prepResArgs.OK {
@@ -242,12 +250,11 @@ func (px *Paxos) proposer(seq int) {
 				max_seen = prepResArgs.N_a
 				v_ = prepResArgs.V_a
 			}
-
 		}
 	} // for
 
 	if !px.isMajority(acceptedPrepare) {
-		if pinged < (len(px.peers) / 2) + 1 {
+		if pinged < (len(peers) / 2) + 1 {
 			time.Sleep(5 * time.Millisecond)
 		}
 
@@ -267,18 +274,18 @@ func (px *Paxos) proposer(seq int) {
 	accResArgs := new(AcceptResArgs)
 	acceptedCount := 0
 
-	for i := range px.peers {
-		if i == px.me {
+	for i := range peers {
+		if i == me {
 			px.HandleAccept(accReqArgs, accResArgs)
 		} else {
-			ok = call(px.peers[i], "Paxos.HandleAccept", accReqArgs, accResArgs)
+			ok = call(peers[i], "Paxos.HandleAccept", accReqArgs, accResArgs)
 		}
 		if accResArgs.OK {
 			acceptedCount++
 		}
 		
-		if px.dones[i] < accResArgs.Done {
-			px.dones[i] = accResArgs.Done
+		if dones[i] < accResArgs.Done {
+			dones[i] = accResArgs.Done
 		}
 		
 	}
@@ -295,20 +302,20 @@ func (px *Paxos) proposer(seq int) {
 		Seq: seq,
 		V:   v_,
 		DoneMe: px.me,
-		Done: px.dones[px.me],
+		Done: dones[me],
 	}
 
 	decResArgs := new(DecidedResArgs)
 
-	for i := range px.peers {
-		if i == px.me {
+	for i := range peers {
+		if i == me {
 			px.HandleDecided(decReqArgs, decResArgs)
 		} else {
-			call(px.peers[i], "Paxos.HandleDecided", decReqArgs, decResArgs)
+			call(peers[i], "Paxos.HandleDecided", decReqArgs, decResArgs)
 		}
 		
-		if px.dones[i] < decResArgs.Done {
-			px.dones[i] = decResArgs.Done
+		if dones[i] < decResArgs.Done {
+			dones[i] = decResArgs.Done
 		}
 		
 	}
@@ -325,6 +332,9 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error 
 
 	if !ok {
 		ins = new(instance)
+		ins.Decided = false
+		ins.N_p = -1
+		ins.N_p = -1
 		px.instances[req.Seq] = ins
 	}
 
@@ -367,6 +377,9 @@ func (px *Paxos) HandleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
 
 	if !ok {
 		ins = new(instance)
+		ins.Decided = false
+		ins.N_p = -1
+		ins.N_p = -1
 		px.instances[req.Seq] = ins
 	}
 	
@@ -399,6 +412,9 @@ func (px *Paxos) HandleDecided(req *DecidedReqArgs, res *DecidedResArgs) error {
 
 	if !ok {
 		ins = new(instance)
+		ins.Decided = false
+		ins.N_p = -1
+		ins.N_p = -1
 		px.instances[req.Seq] = ins
 	}
 	
