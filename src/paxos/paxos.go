@@ -61,7 +61,7 @@ type Paxos struct {
 }
 
 // Debugging
-const Debug = 1
+const Debug = 0
 
 func DPrintf(a ...interface{}) (n int, err error) {
 	if Debug > 0 {
@@ -114,11 +114,10 @@ func call(srv string, name string, args interface{}, reply interface{}) bool {
 // is reached.
 //
 func (px *Paxos) Start(seq int, v interface{}) {
-	DPrintf("Start: Application starts on Paxos agreement : " )
-	fmt.Println(seq)
+	DPrintf("Start: Application starts on Paxos agreement : ")
 	px.mu.Lock()
 	min := px.Min()
-	
+
 	if seq < min {
 		DPrintf("Start: ignore seq less than the min (forgotten)")
 		px.mu.Unlock()
@@ -166,7 +165,7 @@ func (px *Paxos) Start(seq int, v interface{}) {
 }
 
 func (px *Paxos) isMajority(counter int) bool {
-	return (counter > (len(px.peers) / 2) + 1)
+	return (counter > (len(px.peers)/2)+1)
 }
 
 func (px *Paxos) proposer(seq int) {
@@ -195,14 +194,14 @@ func (px *Paxos) proposer(seq int) {
 
 	// We need unique N here
 	ins.N = int(time.Now().UnixNano())*len(px.peers) + me
-	
+
 	// Send Prepare message.
 	// Construct req and res args
 	DPrintf("Send Prepare message...")
 	prepReqArgs := &PrepareReqArgs{
-		Seq:  seq,
-		N:    ins.N,
-		Me:   me,
+		Seq: seq,
+		N:   ins.N,
+		Me:  me,
 	}
 
 	prepResArgs := new(PrepareRespArgs)
@@ -211,50 +210,51 @@ func (px *Paxos) proposer(seq int) {
 	acceptedPrepare := 0
 	v_ := ins.V
 
-	ok = false
 	for i := range peers {
+		ok = false
 		if i == me {
-			px.HandlePrepare(prepReqArgs, prepResArgs)
-			if prepResArgs.OK {
+			err := px.HandlePrepare(prepReqArgs, prepResArgs)
+			if err == nil {
 				pinged++
+				ok = true
 			}
 		} else {
 			ok = call(peers[i], "Paxos.HandlePrepare", prepReqArgs, prepResArgs)
 			if ok {
-				pinged++				
+				pinged++
 			}
 		}
-		
+
 		if dones[i] < prepResArgs.Done {
 			dones[i] = prepResArgs.Done
 		}
-		
 
-		if prepResArgs.Decided {
-			// Learn the decided value and abort.
-			// Because the value sent by this proposer was different from the
-			// value that was decided by consensus.
-			ins.MuL.RLock()
-			defer ins.MuL.RUnlock()
+			if prepResArgs.Decided {
+				// Learn the decided value and abort.
+				// Because the value sent by this proposer was different from the
+				// value that was decided by consensus.
+				ins.MuL.RLock()
 
-			ins.Decided = true
-			ins.V_d = prepResArgs.V_a
+				ins.Decided = true
+				ins.V_d = prepResArgs.V_a
 
-			return
-		}
-
-		if prepResArgs.OK {
-			acceptedPrepare++
-
-			if prepResArgs.N_a > max_seen {
-				max_seen = prepResArgs.N_a
-				v_ = prepResArgs.V_a
+				ins.MuL.RUnlock()
+				return
 			}
-		}
+
+			if prepResArgs.OK {
+				acceptedPrepare++
+
+				if prepResArgs.N_a > max_seen {
+					max_seen = prepResArgs.N_a
+					v_ = prepResArgs.V_a
+				}
+			}
+		
 	} // for
 
 	if !px.isMajority(acceptedPrepare) {
-		if pinged < (len(peers) / 2) + 1 {
+		if pinged < (len(peers)/2)+1 {
 			time.Sleep(5 * time.Millisecond)
 		}
 
@@ -283,11 +283,11 @@ func (px *Paxos) proposer(seq int) {
 		if accResArgs.OK {
 			acceptedCount++
 		}
-		
+
 		if dones[i] < accResArgs.Done {
 			dones[i] = accResArgs.Done
 		}
-		
+
 	}
 
 	if !px.isMajority(acceptedCount) {
@@ -299,10 +299,10 @@ func (px *Paxos) proposer(seq int) {
 	//Now, it's time for send out decision.
 	DPrintf("Send decided value. Consensus has been reached!")
 	decReqArgs := &DecidedReqArgs{
-		Seq: seq,
-		V:   v_,
+		Seq:    seq,
+		V:      v_,
 		DoneMe: px.me,
-		Done: dones[me],
+		Done:   dones[me],
 	}
 
 	decResArgs := new(DecidedResArgs)
@@ -313,11 +313,11 @@ func (px *Paxos) proposer(seq int) {
 		} else {
 			call(peers[i], "Paxos.HandleDecided", decReqArgs, decResArgs)
 		}
-		
+
 		if dones[i] < decResArgs.Done {
 			dones[i] = decResArgs.Done
 		}
-		
+
 	}
 
 	DPrintf("End of proposer")
@@ -347,6 +347,7 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error 
 
 	if ins.Decided {
 		DPrintf("PrepareHandler: respond decided value : ")
+		res.N_a = ins.N_a
 		res.V_a = ins.V_d
 		res.Decided = true
 		ins.MuL.RUnlock()
@@ -382,9 +383,9 @@ func (px *Paxos) HandleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
 		ins.N_p = -1
 		px.instances[req.Seq] = ins
 	}
-	
+
 	res.Done = px.dones[px.me]
-	
+
 	px.mu.Unlock()
 
 	ins.MuA.Lock()
@@ -417,10 +418,10 @@ func (px *Paxos) HandleDecided(req *DecidedReqArgs, res *DecidedResArgs) error {
 		ins.N_p = -1
 		px.instances[req.Seq] = ins
 	}
-	
+
 	px.dones[req.DoneMe] = req.Done
 	res.Done = px.dones[px.me]
-	
+
 	px.mu.Unlock()
 
 	ins.MuL.Lock()

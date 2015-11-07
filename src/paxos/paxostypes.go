@@ -18,16 +18,16 @@ type instance struct {
 }
 
 type PrepareReqArgs struct {
-	Seq  int
-	N    int
-	Me   int
+	Seq int
+	N   int
+	Me  int
 }
 
 type PrepareRespArgs struct {
 	OK      bool
 	N_a     int
 	V_a     interface{}
-	Done 	int
+	Done    int
 	Decided bool
 }
 
@@ -38,18 +38,18 @@ type AcceptReqArgs struct {
 }
 
 type AcceptResArgs struct {
-	OK bool
+	OK   bool
 	Done int
 }
 
 type DecidedReqArgs struct {
-	Seq int
-	V   interface{}
-	Done int
+	Seq    int
+	V      interface{}
+	Done   int
 	DoneMe int
 }
 
 type DecidedResArgs struct {
-	OK bool
+	OK   bool
 	Done int
 }
