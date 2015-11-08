@@ -168,10 +168,24 @@ func (px *Paxos) isMajority(counter int) bool {
 	return (counter > (len(px.peers)/2)+1)
 }
 
-func (px *Paxos) sendPrepare(seq int ) (int,interface{}, int) {
-	px.mu.Lock()
+func (px *Paxos) getInstance(seq int) *instance {
 	ins, ok := px.instances[seq]
 
+	if !ok {
+		ins = new(instance)
+		ins.Decided = false
+		ins.N_p = -1
+		ins.N_p = -1
+		px.instances[seq] = ins
+	}
+	
+	return ins
+}
+
+func (px *Paxos) sendPrepare(seq int, instanceNum int) (bool, int, interface{}, int) {
+	px.mu.Lock()
+	ins, ok := px.instances[seq]
+	
 	me := px.me
 	dones := px.dones
 	peers := px.peers
@@ -182,7 +196,7 @@ func (px *Paxos) sendPrepare(seq int ) (int,interface{}, int) {
 	max_seen := ins.N_p
 	ins.MuA.Unlock()
 	
-	ins.N = int(time.Now().UnixNano())*len(px.peers) + me
+	
 	
 	// Send Prepare message.
 	// Construct req and res args
@@ -226,9 +240,9 @@ func (px *Paxos) sendPrepare(seq int ) (int,interface{}, int) {
 
 				ins.Decided = true
 				ins.V_d = prepResArgs.V_a
-
+				v_d := ins.V_d
 				ins.MuL.RUnlock()
-				return
+				return prepResArgs.Decided, 0, v_d, 0
 			}
 
 			if prepResArgs.OK {
@@ -241,13 +255,11 @@ func (px *Paxos) sendPrepare(seq int ) (int,interface{}, int) {
 			}
 		
 	} // for
-	return acceptedPrepare, v_, pinged
+	return false, acceptedPrepare, v_, pinged
 }
 
-func (px *Paxos) sendAccept(seq int, v_ interface{}) int {
+func (px *Paxos) sendAccept(seq int, instanceNum int, v_ interface{}) int {
 	px.mu.Lock()
-	ins, ok := px.instances[seq]
-
 	me := px.me
 	dones := px.dones
 	peers := px.peers
@@ -258,23 +270,23 @@ func (px *Paxos) sendAccept(seq int, v_ interface{}) int {
 	DPrintf("Send Accept message..")
 	accReqArgs := &AcceptReqArgs{
 		Seq: seq,
-		N:   ins.N,
+		N:   instanceNum,
 		V:   v_,
 	}
 	accResArgs := new(AcceptResArgs)
 	acceptedCount := 0
-
+	
 	for i := range peers {
 		if i == me {
 			px.HandleAccept(accReqArgs, accResArgs)
 		} else {
-			ok = call(peers[i], "Paxos.HandleAccept", accReqArgs, accResArgs)
+			call(peers[i], "Paxos.HandleAccept", accReqArgs, accResArgs)
 		}
-
+		
 		if accResArgs.OK {
 			acceptedCount++
 		}
-
+		
 		if dones[i] < accResArgs.Done {
 			dones[i] = accResArgs.Done
 		}
@@ -284,53 +296,21 @@ func (px *Paxos) sendAccept(seq int, v_ interface{}) int {
 	return acceptedCount
 }
 
-func (px *Paxos) proposer(seq int) {
-	DPrintf("Proposer: start proposer")
+func (px *Paxos) sendDecision(seq int, v_ interface{}) {
+	DPrintf("Send decided value. Consensus has been reached!")
 
 	px.mu.Lock()
-	ins, ok := px.instances[seq]
 
 	me := px.me
 	dones := px.dones
 	peers := px.peers
 
 	px.mu.Unlock()
-
-	if !ok {
-		DPrintf("proposer: Instance not found")
-		return
-	}
-
-	ins.MuP.Lock()
-	defer ins.MuP.Unlock()
-
-	acceptedPrepare, v_, pinged := px.sendPrepare(seq)
 	
-	if !px.isMajority(acceptedPrepare) {
-		if !px.isMajority(pinged) {
-			time.Sleep(5 * time.Millisecond)
-		}
-
-		DPrintf("proposer: I did not get any majority. So, I will retry.........")
-		// No majority. So, wait for a while and retry proposing again
-		go px.proposer(seq)
-		return
-	}
-
-	acceptedCount := px.sendAccept(seq, v_)	
-	
-	if !px.isMajority(acceptedCount) {
-		time.Sleep(5 * time.Millisecond)
-		go px.proposer(seq)
-		return
-	}
-
-	//Now, it's time for send out decision.
-	DPrintf("Send decided value. Consensus has been reached!")
 	decReqArgs := &DecidedReqArgs{
 		Seq:    seq,
 		V:      v_,
-		DoneMe: px.me,
+		DoneMe: me,
 		Done:   dones[me],
 	}
 
@@ -346,8 +326,57 @@ func (px *Paxos) proposer(seq int) {
 		if dones[i] < decResArgs.Done {
 			dones[i] = decResArgs.Done
 		}
-
 	}
+}
+
+func (px *Paxos) proposer(seq int) {
+	DPrintf("Proposer: start proposer")
+
+	px.mu.Lock()
+	ins, ok := px.instances[seq]
+	me := px.me
+	peers := px.peers
+	px.mu.Unlock()
+
+	if !ok {
+		DPrintf("proposer: Instance not found")
+		return
+	}
+
+	ins.MuP.Lock()
+	ins.N = int(time.Now().UnixNano())*len(peers) + me
+	instanceNum := ins.N
+	
+	ins.MuP.Unlock()
+
+	pDecided, acceptedPrepare, v_, pinged := px.sendPrepare(seq, instanceNum)
+	
+	if pDecided {
+		px.sendDecision(seq, v_)
+		return
+	}
+	
+	if !px.isMajority(acceptedPrepare) {
+		if !px.isMajority(pinged) {
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		DPrintf("proposer: I did not get any majority. So, I will retry.........")
+		// No majority. So, wait for a while and retry proposing again
+		go px.proposer(seq)
+		return
+	}
+
+	acceptedCount := px.sendAccept(seq, instanceNum, v_)	
+	
+	if !px.isMajority(acceptedCount) {
+		time.Sleep(5 * time.Millisecond)
+		go px.proposer(seq)
+		return
+	}
+
+	//Now, it's time for send out decision.
+	px.sendDecision(seq, v_)
 
 	DPrintf("End of proposer")
 	return
@@ -357,15 +386,7 @@ func (px *Paxos) proposer(seq int) {
 func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error {
 	px.mu.Lock()
 
-	ins, ok := px.instances[req.Seq]
-
-	if !ok {
-		ins = new(instance)
-		ins.Decided = false
-		ins.N_p = -1
-		ins.N_p = -1
-		px.instances[req.Seq] = ins
-	}
+	ins := px.getInstance(req.Seq)
 
 	res.Done = px.dones[px.me]
 
@@ -403,18 +424,10 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error 
 // Handle the accept request
 func (px *Paxos) HandleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
 	px.mu.Lock()
-	ins, ok := px.instances[req.Seq]
-
-	if !ok {
-		ins = new(instance)
-		ins.Decided = false
-		ins.N_p = -1
-		ins.N_p = -1
-		px.instances[req.Seq] = ins
-	}
-
+	
+	ins := px.getInstance(req.Seq)
 	res.Done = px.dones[px.me]
-
+	
 	px.mu.Unlock()
 
 	ins.MuA.Lock()
@@ -438,16 +451,7 @@ func (px *Paxos) HandleDecided(req *DecidedReqArgs, res *DecidedResArgs) error {
 
 	px.mu.Lock()
 
-	ins, ok := px.instances[req.Seq]
-
-	if !ok {
-		ins = new(instance)
-		ins.Decided = false
-		ins.N_p = -1
-		ins.N_p = -1
-		px.instances[req.Seq] = ins
-	}
-
+	ins := px.getInstance(req.Seq)
 	px.dones[req.DoneMe] = req.Done
 	res.Done = px.dones[px.me]
 
