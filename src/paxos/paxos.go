@@ -168,9 +168,7 @@ func (px *Paxos) isMajority(counter int) bool {
 	return (counter > (len(px.peers)/2)+1)
 }
 
-func (px *Paxos) proposer(seq int) {
-	DPrintf("Proposer: start proposer")
-
+func (px *Paxos) sendPrepare(seq int ) (int,interface{}, int) {
 	px.mu.Lock()
 	ins, ok := px.instances[seq]
 
@@ -180,21 +178,12 @@ func (px *Paxos) proposer(seq int) {
 
 	px.mu.Unlock()
 
-	if !ok {
-		DPrintf("proposer: Instance not found")
-		return
-	}
-
 	ins.MuA.Lock()
 	max_seen := ins.N_p
 	ins.MuA.Unlock()
-
-	ins.MuP.Lock()
-	defer ins.MuP.Unlock()
-
-	// We need unique N here
+	
 	ins.N = int(time.Now().UnixNano())*len(px.peers) + me
-
+	
 	// Send Prepare message.
 	// Construct req and res args
 	DPrintf("Send Prepare message...")
@@ -252,17 +241,18 @@ func (px *Paxos) proposer(seq int) {
 			}
 		
 	} // for
+	return acceptedPrepare, v_, pinged
+}
 
-	if !px.isMajority(acceptedPrepare) {
-		if pinged < (len(peers)/2)+1 {
-			time.Sleep(5 * time.Millisecond)
-		}
+func (px *Paxos) sendAccept(seq int, v_ interface{}) int {
+	px.mu.Lock()
+	ins, ok := px.instances[seq]
 
-		DPrintf("proposer: I did not get any majority. So, I will retry.........")
-		// No majority. So, wait for a while and retry proposing again
-		go px.proposer(seq)
-		return
-	}
+	me := px.me
+	dones := px.dones
+	peers := px.peers
+
+	px.mu.Unlock()
 
 	//Now Send Accept
 	DPrintf("Send Accept message..")
@@ -280,6 +270,7 @@ func (px *Paxos) proposer(seq int) {
 		} else {
 			ok = call(peers[i], "Paxos.HandleAccept", accReqArgs, accResArgs)
 		}
+
 		if accResArgs.OK {
 			acceptedCount++
 		}
@@ -289,7 +280,45 @@ func (px *Paxos) proposer(seq int) {
 		}
 
 	}
+	
+	return acceptedCount
+}
 
+func (px *Paxos) proposer(seq int) {
+	DPrintf("Proposer: start proposer")
+
+	px.mu.Lock()
+	ins, ok := px.instances[seq]
+
+	me := px.me
+	dones := px.dones
+	peers := px.peers
+
+	px.mu.Unlock()
+
+	if !ok {
+		DPrintf("proposer: Instance not found")
+		return
+	}
+
+	ins.MuP.Lock()
+	defer ins.MuP.Unlock()
+
+	acceptedPrepare, v_, pinged := px.sendPrepare(seq)
+	
+	if !px.isMajority(acceptedPrepare) {
+		if !px.isMajority(pinged) {
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		DPrintf("proposer: I did not get any majority. So, I will retry.........")
+		// No majority. So, wait for a while and retry proposing again
+		go px.proposer(seq)
+		return
+	}
+
+	acceptedCount := px.sendAccept(seq, v_)	
+	
 	if !px.isMajority(acceptedCount) {
 		time.Sleep(5 * time.Millisecond)
 		go px.proposer(seq)
