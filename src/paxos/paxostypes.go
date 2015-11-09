@@ -21,6 +21,7 @@ type PrepareReqArgs struct {
 	Seq int
 	N   int
 	Me  int
+	Done int
 }
 
 type PrepareRespArgs struct {
