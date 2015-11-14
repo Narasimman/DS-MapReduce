@@ -61,7 +61,7 @@ type Paxos struct {
 }
 
 // Debugging
-const Debug = 1
+const Debug = 0
 
 func DPrintf(a ...interface{}) (n int, err error) {
 	if Debug > 0 {
@@ -199,7 +199,7 @@ func (px *Paxos) proposer(seq int) {
 
 	if !px.isMajority(acceptedPrepare) {
 		if !px.isMajority(pinged) {
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 		}
 
 		DPrintf("proposer: I did not get any majority. So, I will retry.........")
@@ -211,7 +211,7 @@ func (px *Paxos) proposer(seq int) {
 	acceptedCount := px.sendAccept(seq, instanceNum, v_)
 
 	if !px.isMajority(acceptedCount) {
-		time.Sleep(5 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		go px.proposer(seq)
 		return
 	}
