@@ -108,7 +108,7 @@ func (kv *KVPaxos) requestOperation(req Op) (bool, string) {
 
 		seq := kv.completed + 1
 		decided, t := kv.px.Status(seq)
-				
+
 		var res Op
 		if decided == paxos.Decided {
 			res = t.(Op)
