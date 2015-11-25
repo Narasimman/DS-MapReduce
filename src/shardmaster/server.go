@@ -4,6 +4,7 @@ import "net"
 import "fmt"
 import "net/rpc"
 import "log"
+import "time"
 
 import "paxos"
 import "sync"
@@ -36,12 +37,23 @@ type Op struct {
 	UUID		int64 
 }
 
+// Debugging
+const Debug = 0
+
+func DPrintf(a ...interface{}) (n int, err error) {
+	if Debug > 0 {
+		n, err = fmt.Println(a...)
+	}
+	return
+}
+
+
 func (sm *ShardMaster) WaitOnAgreement(seq int) Op{
 	DPrintf("Wait on agreement")
 	to := 10 * time.Millisecond
 	var res Op
 	for {
-		decided, val := kv.px.Status(seq)
+		decided, val := sm.px.Status(seq)
 		if decided == paxos.Decided {
 			res = val.(Op)
 			return res
@@ -54,6 +66,7 @@ func (sm *ShardMaster) WaitOnAgreement(seq int) Op{
 		DPrintf("Waiting")
 	}
 }
+
 
 func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
 	// Your code here.

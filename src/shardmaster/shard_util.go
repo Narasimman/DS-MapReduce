@@ -7,9 +7,22 @@ const (
 	LeaveOp	= "Leave"	
 )
 
-func (sm *ShardMaster) PerformOp(op Op, seq int) {
+func (sm *ShardMaster) CallOp(op Op, seq int) Config {
 	sm.processed++
 	
+	gid, servers, shard, num := op.GroupId, op.Servers, op.Shard, op.Num
+	switch op.Type {
+		case JoinOp:
+			sm.DoJoin(gid, servers)
+		case MoveOp:
+		
+		case QueryOp:
+		
+		case LeaveOp:
+		
+		default:
+			
+	}
 }
 
 
@@ -24,6 +37,11 @@ func (sm *ShardMaster) RequestOp(op Op) Config {
 		} else {
 			sm.px.Start(seq, op)
 			res = sm.WaitOnAgreement(seq)
+		}
+		config := sm.CallOp(op, seq)
+		
+		if res.UUID == op.UUID {
+			return config
 		}
 	}
 }
