@@ -22,10 +22,37 @@ type ShardMaster struct {
 	px         *paxos.Paxos
 
 	configs []Config // indexed by config num
+	processed 	int //  processed in paxos
+	configNum	int	// current largest config number
 }
 
 type Op struct {
 	// Your data here.
+	Type 	string
+	GroupId int64
+	Servers []string
+	Shard	int
+	Num		int
+	UUID		int64 
+}
+
+func (sm *ShardMaster) WaitOnAgreement(seq int) Op{
+	DPrintf("Wait on agreement")
+	to := 10 * time.Millisecond
+	var res Op
+	for {
+		decided, val := kv.px.Status(seq)
+		if decided == paxos.Decided {
+			res = val.(Op)
+			return res
+		}
+
+		time.Sleep(to)
+		if to < 10 * time.Second {
+			to *= 2
+		}
+		DPrintf("Waiting")
+	}
 }
 
 func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
