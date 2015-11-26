@@ -7,6 +7,28 @@ const (
 	LeaveOp	= "Leave"	
 )
 
+func (sm *ShardMaster) getNextConfig() *Config {
+	oldConfig := &sm.configs[sm.configNum]
+	
+	var newConfig Config
+	newConfig.Num = oldConfig.Num + 1
+	newConfig.Groups = map[int64][]string{}
+	newConfig.Shards = [NShards]int64{}
+	
+	for gid, servers := range oldConfig.Groups {
+		newConfig.Groups[gid] = servers
+	}
+	
+	for shard, gid := range oldConfig.Shards {
+		newConfig.Shards[shard] = gid
+	}
+	
+	sm.configNum++
+	sm.configs = append(sm.configs, newConfig)
+	return &sm.configs[sm.configNum]
+	
+}
+
 func (sm *ShardMaster) CallOp(op Op, seq int) Config {
 	sm.processed++
 	
