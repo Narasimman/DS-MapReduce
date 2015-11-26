@@ -1,6 +1,10 @@
 package shardmaster
 
-import "paxos"
+import (
+	"os"
+	"paxos"
+	"fmt"
+)
 
 const (
 	JoinOp 	= "Join"
@@ -123,13 +127,13 @@ func (sm *ShardMaster) CallOp(op Op, seq int) Config {
 		case JoinOp:
 			sm.DoJoin(gid, servers)
 		case MoveOp:
-			
+			sm.DoMove(shard, gid)
 		case QueryOp:
-		
+			return sm.DoQuery(num)
 		case LeaveOp:
-		
+			sm.DoLeave(gid)
 		default:
-			
+			fmt.Println("Invalid Operation")
 	}
 	return Config{}
 }
@@ -152,6 +156,22 @@ func (sm *ShardMaster) RequestOp(op Op) Config {
 		if res.UUID == op.UUID {
 			return config
 		}
+	}
+}
+
+func (sm *ShardMaster) isValidConfig(config Config) {
+	if len(config.Groups) < 1 {
+		return
+	}
+	
+	for _, gid := range config.Shards {
+		_, exists := config.Groups[gid]
+		
+		if !exists {
+			fmt.Println("Invalid Configuration")
+			os.Exit(-1)
+		}
+		
 	}
 }
 

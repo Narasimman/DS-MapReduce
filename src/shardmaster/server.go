@@ -70,25 +70,62 @@ func (sm *ShardMaster) WaitOnAgreement(seq int) Op{
 
 func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
 	// Your code here.
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	
+	op := Op {
+		Type  	:	JoinOp,
+		GroupId	:	args.GID,
+		Servers	:	args.Servers,
+	}
+	
+	sm.RequestOp(op)
 
 	return nil
 }
 
 func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) error {
 	// Your code here.
-
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	
+	op := Op {
+		Type		:	LeaveOp,
+		GroupId	: 	args.GID,
+	}
+	
+	sm.RequestOp(op)
+	
 	return nil
 }
 
 func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) error {
 	// Your code here.
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	
+	op := Op {
+		Type		: MoveOp,
+		Shard	: args.Shard,
+		GroupId	: args.GID,
+	}
 
+	sm.RequestOp(op)
+	
 	return nil
 }
 
 func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) error {
 	// Your code here.
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	
+	op := Op {
+		Type		: QueryOp,
+		Num		: args.Num,
+	}
 
+	sm.RequestOp(op)
 	return nil
 }
 
