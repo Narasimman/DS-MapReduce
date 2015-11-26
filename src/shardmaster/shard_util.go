@@ -1,11 +1,15 @@
 package shardmaster
 
+import "paxos"
+
 const (
 	JoinOp 	= "Join"
 	MoveOp 	= "Move"
 	QueryOp	= "Query"
 	LeaveOp	= "Leave"	
 )
+
+
 
 func (sm *ShardMaster) getNextConfig() *Config {
 	oldConfig := &sm.configs[sm.configNum]
@@ -37,7 +41,7 @@ func (sm *ShardMaster) CallOp(op Op, seq int) Config {
 		case JoinOp:
 			sm.DoJoin(gid, servers)
 		case MoveOp:
-		
+			
 		case QueryOp:
 		
 		case LeaveOp:
@@ -45,6 +49,7 @@ func (sm *ShardMaster) CallOp(op Op, seq int) Config {
 		default:
 			
 	}
+	return Config{}
 }
 
 
