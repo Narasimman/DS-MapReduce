@@ -15,6 +15,7 @@ func GetShard(gid int64, config *Config) int {
 			return shard
 		}
 	}
+	return -1
 }
 
 /*
