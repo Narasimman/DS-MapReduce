@@ -38,7 +38,7 @@ type Op struct {
 }
 
 // Debugging
-const Debug = 0
+const Debug = 1
 
 func DPrintf(a ...interface{}) (n int, err error) {
 	if Debug > 0 {
@@ -73,6 +73,8 @@ func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	
+	DPrintf("Join Operation:")
+	
 	op := Op {
 		Type  	:	JoinOp,
 		GroupId	:	args.GID,
@@ -80,7 +82,7 @@ func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
 	}
 	
 	sm.RequestOp(op)
-
+	sm.isValidConfig(sm.configs[sm.configNum])
 	return nil
 }
 
@@ -89,12 +91,15 @@ func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	
+	DPrintf("Leave Operation:")
+	
 	op := Op {
 		Type		:	LeaveOp,
 		GroupId	: 	args.GID,
 	}
 	
 	sm.RequestOp(op)
+	sm.isValidConfig(sm.configs[sm.configNum])
 	
 	return nil
 }
@@ -104,6 +109,7 @@ func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	
+	DPrintf("Move Operation:")
 	op := Op {
 		Type		: MoveOp,
 		Shard	: args.Shard,
@@ -111,7 +117,7 @@ func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) error {
 	}
 
 	sm.RequestOp(op)
-	
+	sm.isValidConfig(sm.configs[sm.configNum])
 	return nil
 }
 
@@ -120,12 +126,15 @@ func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	
+	DPrintf("Query Operation:")
+	
 	op := Op {
 		Type		: QueryOp,
 		Num		: args.Num,
 	}
 
-	sm.RequestOp(op)
+	reply.Config = sm.RequestOp(op)
+	sm.isValidConfig(sm.configs[sm.configNum])
 	return nil
 }
 

@@ -6,12 +6,22 @@ import (
 	"fmt"
 )
 
+import "crypto/rand"
+import "math/big"
+
 const (
 	JoinOp 	= "Join"
 	MoveOp 	= "Move"
 	QueryOp	= "Query"
 	LeaveOp	= "Leave"	
 )
+
+func nrand() int64 {
+	max := big.NewInt(int64(1) << 62)
+	bigx, _ := rand.Int(rand.Reader, max)
+	x := bigx.Int64()
+	return x
+}
 
 func GetShard(gid int64, config *Config) int {
 	for shard, g := range config.Shards {
@@ -135,11 +145,13 @@ func (sm *ShardMaster) CallOp(op Op, seq int) Config {
 		default:
 			fmt.Println("Invalid Operation")
 	}
+	sm.px.Done(sm.processed)
 	return Config{}
 }
 
 
 func (sm *ShardMaster) RequestOp(op Op) Config {
+	op.UUID = nrand()
 	// Loop until paxos gives a decision
 	for { 
 		seq := sm.processed + 1
