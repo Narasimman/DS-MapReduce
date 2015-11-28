@@ -2,11 +2,12 @@ package shardmaster
 
 func (sm *ShardMaster) DoJoin(gid int64, servers []string) {
 	config := sm.GetNextConfig()
-	
+
 	_, exists := config.Groups[gid]
-	
+
 	if !exists {
-		DPrintf("Join a new group")
+		//DPrintf("Join a new group")
+		DPrintf(gid)
 		config.Groups[gid] = servers
 		sm.RebalanceShards(gid, JoinOp)
 	}
@@ -14,14 +15,15 @@ func (sm *ShardMaster) DoJoin(gid int64, servers []string) {
 
 func (sm *ShardMaster) DoLeave(gid int64) {
 	config := sm.GetNextConfig()
-	
+
 	_, exists := config.Groups[gid]
-	
+	//DPrintf(gid)
+	//DPrintf(exists)
 	if exists {
+		DPrintf("Leaving bye bye")
 		delete(config.Groups, gid)
 		sm.RebalanceShards(gid, LeaveOp)
 	}
-	
 }
 
 func (sm *ShardMaster) DoMove(shard int, gid int64) {

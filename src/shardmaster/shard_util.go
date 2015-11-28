@@ -80,28 +80,29 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 	
 	for {
 		light, heavy := FindGroupToBalance(config)
-		
+
 		if operation == LeaveOp {
+			//DPrintf("Rebalance shard for leave operation")
 			shard := GetShard(gid, config)
 			
 			if shard == -1 {
 				break
 			}
-			
+
 			config.Shards[shard] = light
 			
 		} else if operation == JoinOp {
+			//DPrintf("Rebalance operaion for Join Operation")
 			if i == NShards / len(config.Groups) {
 				break
 			}
-			
+
 			shard := GetShard(heavy, config)
 			config.Shards[shard] = gid
 		} else {
-			// Invalid operation
+			DPrintf("Calling rebalancing for invalid operation")
 		}
-		
-		
+
 		i++
 	}
 }
@@ -122,11 +123,10 @@ func (sm *ShardMaster) GetNextConfig() *Config {
 	for shard, gid := range oldConfig.Shards {
 		newConfig.Shards[shard] = gid
 	}
-	
+
 	sm.configNum++
 	sm.configs = append(sm.configs, newConfig)
-	return &sm.configs[sm.configNum]
-	
+	return &sm.configs[sm.configNum]	
 }
 
 func (sm *ShardMaster) CallOp(op Op, seq int) Config {
@@ -153,7 +153,8 @@ func (sm *ShardMaster) CallOp(op Op, seq int) Config {
 func (sm *ShardMaster) RequestOp(op Op) Config {
 	op.UUID = nrand()
 	// Loop until paxos gives a decision
-	for { 
+	for {
+		//DPrintf("Looping until paxos gives a decision") 
 		seq := sm.processed + 1
 		decided, val :=sm.px.Status(seq)
 		var res Op
@@ -186,4 +187,3 @@ func (sm *ShardMaster) isValidConfig(config Config) {
 		
 	}
 }
-
