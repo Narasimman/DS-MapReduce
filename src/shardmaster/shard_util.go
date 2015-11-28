@@ -152,6 +152,7 @@ func (sm *ShardMaster) CallOp(op Op, seq int) Config {
 
 func (sm *ShardMaster) RequestOp(op Op) Config {
 	op.UUID = nrand()
+
 	// Loop until paxos gives a decision
 	for {
 		//DPrintf("Looping until paxos gives a decision") 
@@ -164,8 +165,8 @@ func (sm *ShardMaster) RequestOp(op Op) Config {
 			sm.px.Start(seq, op)
 			res = sm.WaitOnAgreement(seq)
 		}
-		config := sm.CallOp(op, seq)
-		
+		config := sm.CallOp(res, seq)
+
 		if res.UUID == op.UUID {
 			return config
 		}
@@ -176,14 +177,15 @@ func (sm *ShardMaster) isValidConfig(config Config) {
 	if len(config.Groups) < 1 {
 		return
 	}
-	
+
+	DPrintf(config.Groups)
+
 	for _, gid := range config.Shards {
 		_, exists := config.Groups[gid]
-		
+
 		if !exists {
 			fmt.Println("Invalid Configuration")
 			os.Exit(-1)
 		}
-		
 	}
 }

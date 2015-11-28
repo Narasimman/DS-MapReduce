@@ -7,7 +7,6 @@ func (sm *ShardMaster) DoJoin(gid int64, servers []string) {
 
 	if !exists {
 		//DPrintf("Join a new group")
-		DPrintf(gid)
 		config.Groups[gid] = servers
 		sm.RebalanceShards(gid, JoinOp)
 	}
@@ -17,8 +16,7 @@ func (sm *ShardMaster) DoLeave(gid int64) {
 	config := sm.GetNextConfig()
 
 	_, exists := config.Groups[gid]
-	//DPrintf(gid)
-	//DPrintf(exists)
+
 	if exists {
 		DPrintf("Leaving bye bye")
 		delete(config.Groups, gid)
@@ -36,7 +34,7 @@ func (sm *ShardMaster) DoQuery(num int) Config {
 	if num == -1 {
 		config := sm.configs[sm.configNum]
 		sm.isValidConfig(config)
-		return sm.configs[sm.configNum]
+		return config
 	} else {
 		return sm.configs[num]
 	}
