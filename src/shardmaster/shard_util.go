@@ -46,11 +46,11 @@ func FindGroupToBalance(config *Config) (int64, int64) {
 	for gid := range config.Groups {
 		counts[gid] = 0
 	}
-	
+
 	for _, gid := range config.Shards {
 		counts[gid] = counts[gid] + 1
 	}
-	
+
 	for gid := range counts {
 		_, exists := config.Groups[gid]
 		
@@ -58,7 +58,7 @@ func FindGroupToBalance(config *Config) (int64, int64) {
 			l_count = counts[gid]
 			light = gid
 		}
-		
+
 		if exists && h_count < counts[gid] {
 			h_count = counts[gid]
 			heavy	= gid
@@ -70,19 +70,19 @@ func FindGroupToBalance(config *Config) (int64, int64) {
 			heavy = 0
 		}
 	}
-	
+
 	return light, heavy
 }
 
 func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 	config := &sm.configs[sm.configNum]
 	i := 0
-	
+
 	for {
 		light, heavy := FindGroupToBalance(config)
 
 		if operation == LeaveOp {
-			//DPrintf("Rebalance shard for leave operation")
+			DPrintf("Rebalance shard for leave operation")
 			shard := GetShard(gid, config)
 			
 			if shard == -1 {
@@ -92,7 +92,7 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 			config.Shards[shard] = light
 			
 		} else if operation == JoinOp {
-			//DPrintf("Rebalance operaion for Join Operation")
+			DPrintf("Rebalance operaion for Join Operation")
 			if i == NShards / len(config.Groups) {
 				break
 			}

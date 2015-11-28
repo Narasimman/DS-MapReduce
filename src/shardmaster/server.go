@@ -28,7 +28,6 @@ type ShardMaster struct {
 }
 
 type Op struct {
-	// Your data here.
 	Type 	string
 	GroupId int64
 	Servers []string
@@ -49,7 +48,6 @@ func DPrintf(a ...interface{}) (n int, err error) {
 
 
 func (sm *ShardMaster) WaitOnAgreement(seq int) Op{
-	//DPrintf("Wait on agreement")
 	to := 10 * time.Millisecond
 	var res Op
 	for {
@@ -63,17 +61,14 @@ func (sm *ShardMaster) WaitOnAgreement(seq int) Op{
 		if to < 10 * time.Second {
 			to *= 2
 		}
-		//DPrintf("Waiting")
 	}
 }
 
-
 func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
-	// Your code here.
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	
-	//DPrintf("Join Operation:")
+	DPrintf("Join Operation:")
 	
 	op := Op {
 		Type  	:	JoinOp,
@@ -87,7 +82,6 @@ func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
 }
 
 func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) error {
-	// Your code here.
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	
@@ -105,7 +99,6 @@ func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) error {
 }
 
 func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) error {
-	// Your code here.
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	
@@ -122,7 +115,6 @@ func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) error {
 }
 
 func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) error {
-	// Your code here.
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	
@@ -134,7 +126,6 @@ func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) error {
 	}
 
 	reply.Config = sm.RequestOp(op)
-	//sm.isValidConfig(sm.configs[sm.configNum])
 	return nil
 }
 
