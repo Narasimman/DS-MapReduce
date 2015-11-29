@@ -1,19 +1,19 @@
 package shardmaster
 
 import (
+	"fmt"
 	"os"
 	"paxos"
-	"fmt"
 )
 
 import "crypto/rand"
 import "math/big"
 
 const (
-	JoinOp 	= "Join"
-	MoveOp 	= "Move"
-	QueryOp	= "Query"
-	LeaveOp	= "Leave"	
+	JoinOp  = "Join"
+	MoveOp  = "Move"
+	QueryOp = "Query"
+	LeaveOp = "Leave"
 )
 
 func nrand() int64 {
@@ -36,14 +36,14 @@ func GetShard(gid int64, config *Config) int {
 }
 
 /*
-This function finds the group that has less and more number of shards 
+This function finds the group that has less and more number of shards
 The group that is light will be used for leave operation
 	and shards will be added to the light group
 The group that is heavy will be used during join operation
 	and those shards will be added to the new group
 */
-func FindGroupToBalance(config *Config, operation string) (int64) {
-	group, l_count, h_count := int64(0), int(^uint(0) >> 1), -1
+func FindGroupToBalance(config *Config, operation string) int64 {
+	group, l_count, h_count := int64(0), int(^uint(0)>>1), -1
 	counts := make(map[int64]int)
 
 	for gid := range config.Groups {
@@ -56,18 +56,18 @@ func FindGroupToBalance(config *Config, operation string) (int64) {
 
 	for gid := range counts {
 		_, exists := config.Groups[gid]
-		
+
 		if exists {
 			if operation == LeaveOp {
 				if l_count > counts[gid] {
 					l_count = counts[gid]
-					group = gid	
+					group = gid
 				}
 			} else if operation == JoinOp {
 				if h_count < counts[gid] {
 					h_count = counts[gid]
 					group = gid
-				}	
+				}
 			}
 		}
 	}
@@ -93,7 +93,7 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 		if operation == LeaveOp {
 			DPrintf("Rebalance shard for leave operation")
 			shard := GetShard(gid, config)
-			
+
 			if shard == -1 {
 				break
 			}
@@ -103,7 +103,7 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 
 		} else if operation == JoinOp {
 			DPrintf("Rebalance operation for Join Operation")
-			if i == NShards / len(config.Groups) {
+			if i == NShards/len(config.Groups) {
 				break
 			}
 
@@ -117,26 +117,25 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 	}
 }
 
-
 func (sm *ShardMaster) GetNextConfig() *Config {
 	oldConfig := &sm.configs[sm.configNum]
-	
+
 	var newConfig Config
 	newConfig.Num = oldConfig.Num + 1
-	newConfig.Groups = map[int64][]string{}
+	newConfig.Groups = make(map[int64][]string)
 	newConfig.Shards = [NShards]int64{}
-	
+
 	for gid, servers := range oldConfig.Groups {
 		newConfig.Groups[gid] = servers
 	}
-	
+
 	for shard, gid := range oldConfig.Shards {
 		newConfig.Shards[shard] = gid
 	}
 
 	sm.configNum++
 	sm.configs = append(sm.configs, newConfig)
-	return &sm.configs[sm.configNum]	
+	return &sm.configs[sm.configNum]
 }
 
 /*
@@ -144,33 +143,32 @@ Calls the corresponding handler based on op arguments.
 */
 func (sm *ShardMaster) CallOp(op Op, seq int) Config {
 	sm.processed++
-	
+
 	gid, servers, shard, num := op.GroupId, op.Servers, op.Shard, op.Num
 	switch op.Type {
-		case JoinOp:
-			sm.JoinHandler(gid, servers)
-		case MoveOp:
-			sm.MoveHandler(shard, gid)
-		case QueryOp:
-			return sm.QueryHandler(num)
-		case LeaveOp:
-			sm.LeaveHandler(gid)
-		default:
-			fmt.Println("Invalid Operation")
+	case JoinOp:
+		sm.JoinHandler(gid, servers)
+	case MoveOp:
+		sm.MoveHandler(shard, gid)
+	case QueryOp:
+		return sm.QueryHandler(num)
+	case LeaveOp:
+		sm.LeaveHandler(gid)
+	default:
+		fmt.Println("Invalid Operation")
 	}
 	sm.px.Done(sm.processed)
 	return Config{}
 }
-
 
 func (sm *ShardMaster) RequestOp(op Op) Config {
 	op.UUID = nrand()
 
 	// Loop until paxos gives a decision
 	for {
-		//DPrintf("Looping until paxos gives a decision") 
+		//DPrintf("Looping until paxos gives a decision")
 		seq := sm.processed + 1
-		decided, val :=sm.px.Status(seq)
+		decided, val := sm.px.Status(seq)
 		var res Op
 		if decided == paxos.Decided {
 			res = val.(Op)

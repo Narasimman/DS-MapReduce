@@ -22,18 +22,18 @@ type ShardMaster struct {
 	unreliable int32 // for testing
 	px         *paxos.Paxos
 
-	configs []Config // indexed by config num
-	processed 	int //  processed in paxos
-	configNum	int	// current largest config number
+	configs   []Config // indexed by config num
+	processed int      //  processed in paxos
+	configNum int      // current largest config number
 }
 
 type Op struct {
-	Type 	string
+	Type    string
 	GroupId int64
 	Servers []string
-	Shard	int
-	Num		int
-	UUID		int64 
+	Shard   int
+	Num     int
+	UUID    int64
 }
 
 // Debugging
@@ -46,8 +46,7 @@ func DPrintf(a ...interface{}) (n int, err error) {
 	return
 }
 
-
-func (sm *ShardMaster) WaitOnAgreement(seq int) Op{
+func (sm *ShardMaster) WaitOnAgreement(seq int) Op {
 	to := 10 * time.Millisecond
 	var res Op
 	for {
@@ -58,7 +57,7 @@ func (sm *ShardMaster) WaitOnAgreement(seq int) Op{
 		}
 
 		time.Sleep(to)
-		if to < 10 * time.Second {
+		if to < 10*time.Second {
 			to *= 2
 		}
 	}
@@ -70,10 +69,10 @@ func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
 
 	DPrintf("Join Operation:")
 
-	op := Op {
-		Type  	:	JoinOp,
-		GroupId	:	args.GID,
-		Servers	:	args.Servers,
+	op := Op{
+		Type:    JoinOp,
+		GroupId: args.GID,
+		Servers: args.Servers,
 	}
 
 	sm.RequestOp(op)
@@ -87,9 +86,9 @@ func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) error {
 
 	DPrintf("Leave Operation:")
 
-	op := Op {
-		Type		:	LeaveOp,
-		GroupId	: 	args.GID,
+	op := Op{
+		Type:    LeaveOp,
+		GroupId: args.GID,
 	}
 
 	sm.RequestOp(op)
@@ -101,12 +100,12 @@ func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) error {
 func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	
+
 	DPrintf("Move Operation:")
-	op := Op {
-		Type		: MoveOp,
-		Shard	: args.Shard,
-		GroupId	: args.GID,
+	op := Op{
+		Type:    MoveOp,
+		Shard:   args.Shard,
+		GroupId: args.GID,
 	}
 
 	sm.RequestOp(op)
@@ -117,12 +116,12 @@ func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) error {
 func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	
+
 	DPrintf("Query Operation:")
-	
-	op := Op {
-		Type		: QueryOp,
-		Num		: args.Num,
+
+	op := Op{
+		Type: QueryOp,
+		Num:  args.Num,
 	}
 
 	reply.Config = sm.RequestOp(op)

@@ -2,7 +2,7 @@ package shardmaster
 
 /*
 
-*/
+ */
 func (sm *ShardMaster) JoinHandler(gid int64, servers []string) {
 	config := sm.GetNextConfig()
 
