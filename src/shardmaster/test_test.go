@@ -7,7 +7,8 @@ import "os"
 
 // import "time"
 import "fmt"
-import "math/rand"
+
+//import "math/rand"
 
 func port(tag string, host int) string {
 	s := "/var/tmp/824-"
@@ -284,7 +285,7 @@ func TestBasic(t *testing.T) {
 	fmt.Printf("  ... Passed\n")
 }
 
-
+/*
 func TestUnreliable(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 
