@@ -23,6 +23,9 @@ func nrand() int64 {
 	return x
 }
 
+/*
+Returns the shard for a given group id and config.
+*/
 func GetShard(gid int64, config *Config) int {
 	for shard, g := range config.Shards {
 		if gid == g {
@@ -39,10 +42,10 @@ The group that is light will be used for leave operation
 The group that is heavy will be used during join operation
 	and those shards will be added to the new group
 */
-func FindGroupToBalance(config *Config) (int64, int64) {
-	light, l_count, heavy, h_count := int64(0), int(^uint(0) >> 1), int64(0), -1
+func FindGroupToBalance(config *Config, operation string) (int64) {
+	group, l_count, h_count := int64(0), int(^uint(0) >> 1), -1
 	counts := make(map[int64]int)
-	
+
 	for gid := range config.Groups {
 		counts[gid] = 0
 	}
@@ -54,33 +57,39 @@ func FindGroupToBalance(config *Config) (int64, int64) {
 	for gid := range counts {
 		_, exists := config.Groups[gid]
 		
-		if exists && l_count > counts[gid] {
-			l_count = counts[gid]
-			light = gid
-		}
-
-		if exists && h_count < counts[gid] {
-			h_count = counts[gid]
-			heavy	= gid
+		if exists {
+			if operation == LeaveOp {
+				if l_count > counts[gid] {
+					l_count = counts[gid]
+					group = gid	
+				}
+			} else if operation == JoinOp {
+				if h_count < counts[gid] {
+					h_count = counts[gid]
+					group = gid
+				}	
+			}
 		}
 	}
 
 	for _, gid := range config.Shards {
 		if gid == 0 {
-			heavy = 0
+			group = 0
 		}
 	}
 
-	return light, heavy
+	return group
 }
 
+/*
+Rebalances the shards
+
+*/
 func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 	config := &sm.configs[sm.configNum]
 	i := 0
 
 	for {
-		light, heavy := FindGroupToBalance(config)
-
 		if operation == LeaveOp {
 			DPrintf("Rebalance shard for leave operation")
 			shard := GetShard(gid, config)
@@ -89,20 +98,21 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 				break
 			}
 
-			config.Shards[shard] = light
-			
+			group := FindGroupToBalance(config, operation)
+			config.Shards[shard] = group
+
 		} else if operation == JoinOp {
-			DPrintf("Rebalance operaion for Join Operation")
+			DPrintf("Rebalance operation for Join Operation")
 			if i == NShards / len(config.Groups) {
 				break
 			}
 
-			shard := GetShard(heavy, config)
+			group := FindGroupToBalance(config, operation)
+			shard := GetShard(group, config)
 			config.Shards[shard] = gid
 		} else {
 			DPrintf("Calling rebalancing for invalid operation")
 		}
-
 		i++
 	}
 }
@@ -129,19 +139,22 @@ func (sm *ShardMaster) GetNextConfig() *Config {
 	return &sm.configs[sm.configNum]	
 }
 
+/*
+Calls the corresponding handler based on op arguments.
+*/
 func (sm *ShardMaster) CallOp(op Op, seq int) Config {
 	sm.processed++
 	
 	gid, servers, shard, num := op.GroupId, op.Servers, op.Shard, op.Num
 	switch op.Type {
 		case JoinOp:
-			sm.DoJoin(gid, servers)
+			sm.JoinHandler(gid, servers)
 		case MoveOp:
-			sm.DoMove(shard, gid)
+			sm.MoveHandler(shard, gid)
 		case QueryOp:
-			return sm.DoQuery(num)
+			return sm.QueryHandler(num)
 		case LeaveOp:
-			sm.DoLeave(gid)
+			sm.LeaveHandler(gid)
 		default:
 			fmt.Println("Invalid Operation")
 	}
@@ -173,6 +186,10 @@ func (sm *ShardMaster) RequestOp(op Op) Config {
 	}
 }
 
+/*
+If a shard has a group id that is not there in the config groups, then it's an
+unallocated shard. So, exit the program
+*/
 func (sm *ShardMaster) isValidConfig(config Config) {
 	if len(config.Groups) < 1 {
 		return

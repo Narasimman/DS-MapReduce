@@ -1,6 +1,9 @@
 package shardmaster
 
-func (sm *ShardMaster) DoJoin(gid int64, servers []string) {
+/*
+
+*/
+func (sm *ShardMaster) JoinHandler(gid int64, servers []string) {
 	config := sm.GetNextConfig()
 
 	_, exists := config.Groups[gid]
@@ -12,7 +15,7 @@ func (sm *ShardMaster) DoJoin(gid int64, servers []string) {
 	}
 }
 
-func (sm *ShardMaster) DoLeave(gid int64) {
+func (sm *ShardMaster) LeaveHandler(gid int64) {
 	config := sm.GetNextConfig()
 
 	_, exists := config.Groups[gid]
@@ -24,13 +27,16 @@ func (sm *ShardMaster) DoLeave(gid int64) {
 	}
 }
 
-func (sm *ShardMaster) DoMove(shard int, gid int64) {
+func (sm *ShardMaster) MoveHandler(shard int, gid int64) {
 	config := sm.GetNextConfig()
 	config.Shards[shard] = gid
 }
 
-
-func (sm *ShardMaster) DoQuery(num int) Config {
+/*
+Return the highest known configuration if num is negative
+return num config otherwise
+*/
+func (sm *ShardMaster) QueryHandler(num int) Config {
 	if num == -1 {
 		config := sm.configs[sm.configNum]
 		sm.isValidConfig(config)

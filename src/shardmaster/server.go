@@ -67,15 +67,15 @@ func (sm *ShardMaster) WaitOnAgreement(seq int) Op{
 func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	
+
 	DPrintf("Join Operation:")
-	
+
 	op := Op {
 		Type  	:	JoinOp,
 		GroupId	:	args.GID,
 		Servers	:	args.Servers,
 	}
-	
+
 	sm.RequestOp(op)
 	sm.isValidConfig(sm.configs[sm.configNum])
 	return nil
@@ -84,9 +84,9 @@ func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
 func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	
+
 	DPrintf("Leave Operation:")
-	
+
 	op := Op {
 		Type		:	LeaveOp,
 		GroupId	: 	args.GID,
@@ -94,7 +94,7 @@ func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) error {
 
 	sm.RequestOp(op)
 	sm.isValidConfig(sm.configs[sm.configNum])
-	
+
 	return nil
 }
 
