@@ -18,9 +18,9 @@ type instance struct {
 }
 
 type PrepareReqArgs struct {
-	Seq int
-	N   int
-	Me  int
+	Seq  int
+	N    int
+	Me   int
 	Done int
 }
 
@@ -45,8 +45,9 @@ type AcceptResArgs struct {
 
 type DecidedReqArgs struct {
 	Seq    int
+	N		int
 	V      interface{}
-	Done   int
+	Dones  []int
 	DoneMe int
 }
 

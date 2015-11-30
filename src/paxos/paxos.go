@@ -58,7 +58,7 @@ type Paxos struct {
 	instances map[int]*instance //map of paxos instances for each sequence
 	max_known int               //highest sequence known to this peer
 	done      int               //is this peer done?
-	dones     map[int]int       //map of all dones by all paxos peers
+	dones     []int      //map of all dones by all paxos peers
 }
 
 // Debugging
@@ -151,7 +151,7 @@ func (px *Paxos) Start(seq int, v interface{}) {
 	ins.MuP.Unlock()
 
 	DPrintf("start: calling proposer")
-	go px.proposer(seq)
+	go px.proposer(seq, v)
 	DPrintf("Start: End of start")
 }
 
@@ -167,64 +167,124 @@ func (px *Paxos) getInstance(seq int) *instance {
 		ins = new(instance)
 		ins.Decided = false
 		ins.N_p = -1
-		ins.N_p = -1
+		ins.N_a = -1
 		px.instances[seq] = ins
 	}
 
 	return ins
 }
 
-func (px *Paxos) proposer(seq int) {
+func (px *Paxos) proposer(seq int, v interface{}) {
 	DPrintf("Proposer: start proposer")
 
-	px.mu.Lock()
-	ins, ok := px.instances[seq]
-	me := px.me
-	peers := px.peers
-	px.mu.Unlock()
+	for {
+		px.mu.Lock()
+		ins, ok := px.instances[seq]
+		
+		if !ok {
+			ins = px.getInstance(seq)
+		}
+		
+		me := px.me
+		peers := px.peers
+		px.mu.Unlock()
+	
+		ins.MuP.Lock()
+		ins.N = int(time.Now().UnixNano())*len(peers) + me + 1
+		instanceNum := ins.N
+		ins.MuP.Unlock()
+	
+		// Send Prepare message.
+		// Construct req and res args
+		DPrintf("Send Prepare message...")
+		
+		pinged := 0
+		acceptedPrepare := 0
+		max_seen, v_ := -1, v
+	
+		for i := range peers {
+			prepReqArgs := &PrepareReqArgs{
+				Seq:  seq,
+				N:    instanceNum,
+				//Done: done,
+				Me:   me,
+			}
+	
+			prepResArgs := new(PrepareRespArgs)
+			prepResArgs.OK = false
+		
+			ok = false
+			if i == me {
+				err := px.HandlePrepare(prepReqArgs, prepResArgs)
+				if err == nil {
+					pinged++
+					ok = true
+				}
+			} else {
+				ok = call(peers[i], "Paxos.HandlePrepare", prepReqArgs, prepResArgs)
+				if ok {
+					pinged++
+				}
+			}
+	
+			if prepResArgs.OK == true {
+				acceptedPrepare++
+	
+				if prepResArgs.N_a > max_seen {
+					max_seen = prepResArgs.N_a
+					v_ = prepResArgs.V_a
+				}
+			}
+		} // for prepare
+		
+		if !px.isMajority(acceptedPrepare) {
+			continue
+		}
+		
+		acceptedCount := 0
+	
+		for i := range peers {
+			accReqArgs := &AcceptReqArgs{
+				Seq: seq,
+				N:   instanceNum,
+				V:   v_,
+			}
+			accResArgs := new(AcceptResArgs)
+			accResArgs.OK = false
 
-	if !ok {
-		DPrintf("proposer: Instance not found")
-		return
-	}
-
-	ins.MuP.Lock()
-	ins.N = int(time.Now().UnixNano())*len(peers) + me + 1
-	instanceNum := ins.N
-	ins.MuP.Unlock()
-
-	pDecided, acceptedPrepare, v_, pinged := px.sendPrepare(seq, instanceNum)
-
-	if pDecided {
-		return
-	}
-
-	if !px.isMajority(acceptedPrepare) {
-		if !px.isMajority(pinged) {
-			time.Sleep(10 * time.Millisecond)
+			if i == me {
+				px.HandleAccept(accReqArgs, accResArgs)
+			} else {
+				call(peers[i], "Paxos.HandleAccept", accReqArgs, accResArgs)
+			}
+	
+			if accResArgs.OK == true {
+				acceptedCount++
+			}
 		}
 
-		DPrintf("proposer: I did not get any majority. So, I will retry.........")
-		// No majority. So, wait for a while and retry proposing again
-		go px.proposer(seq)
+		if !px.isMajority(acceptedCount) {
+			continue
+		}
+
+		for i := range peers {
+			decReqArgs := &DecidedReqArgs{
+				Seq: seq	,
+				N: ins.N,
+				V:   v_,
+				Dones : px.dones,
+				DoneMe : px.me,
+			}
+			decResArgs := new(DecidedResArgs)
+
+			if i == me {
+				px.HandleDecided(decReqArgs, decResArgs)
+			} else {
+				call(peers[i], "Paxos.HandleDecided", decReqArgs, decResArgs)
+			}
+		}
 		return
-	}
-
-	acceptedCount := px.sendAccept(seq, instanceNum, v_)
-
-	if !px.isMajority(acceptedCount) {
-		time.Sleep(10 * time.Millisecond)
-		go px.proposer(seq)
-		return
-	}
-
-	//Now, it's time for send out decision.
-	px.sendDecision(seq, v_)
-
-	
-
-	DPrintf("End of proposer")
-	return
+	}// infinite for
 }
 
 //
@@ -240,8 +300,9 @@ func (px *Paxos) Done(seq int) {
 	if px.done < seq {
 		px.done = seq
 		px.dones[px.me] = seq
-		for k := range px.instances {
-			if k <= seq {
+		
+		for k, ins := range px.instances {
+			if k <= seq && ins.Decided {
 				delete(px.instances, k)
 			}
 		}
@@ -384,7 +445,7 @@ func Make(peers []string, me int, rpcs *rpc.Server) *Paxos {
 	px.instances = make(map[int]*instance)
 	px.max_known = -1
 	px.done = -1
-	px.dones = make(map[int]int)
+	px.dones = make([]int, len(px.peers))
 	px.n_servers = len(peers)
 
 	for k := range px.peers {

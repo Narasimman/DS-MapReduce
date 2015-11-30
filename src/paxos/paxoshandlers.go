@@ -3,27 +3,12 @@ package paxos
 // Handle the prepare request
 func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error {
 	px.mu.Lock()
-
 	ins := px.getInstance(req.Seq)
-
-	//res.Done = px.dones[px.me]
-	
-	px.dones[req.Me] = req.Done
-
 	px.mu.Unlock()
 
-	// Learn  the decided value
-	ins.MuL.RLock()
-
-	if ins.Decided {
-		DPrintf("PrepareHandler: respond decided value : ")
-		res.N_a = ins.N_a
-		res.V_a = ins.V_d
-		res.Decided = true
-		ins.MuL.RUnlock()
-		return nil
-	}
-	ins.MuL.RUnlock()
+	res.N_a = ins.N_a
+	res.V_a = ins.V_a
+	res.OK = true
 
 	ins.MuA.Lock()
 	defer ins.MuA.Unlock()
@@ -31,12 +16,11 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error 
 	//Check the incoming prepare request and accept or reject
 	if req.N > ins.N_p {
 		ins.N_p = req.N
+		res.N_a = ins.N_a
+		res.V_a = ins.V_a
+		res.OK = true
 	}
-	
-	res.N_a = ins.N_a
-	res.V_a = ins.V_a
-	res.OK = true
-	
+
 	return nil
 }
 
@@ -44,9 +28,18 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error 
 func (px *Paxos) HandleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
 	px.mu.Lock()
 
-	ins := px.getInstance(req.Seq)
-	res.Done = px.dones[px.me]
+	seq := req.Seq
+	ins, ok := px.instances[seq]
 
+	if !ok {
+		ins = new(instance)
+		ins.Decided = false
+		ins.N_p = req.N
+		ins.N_a = req.N
+		ins.V_a = req.V
+		px.instances[seq] = ins
+	}
+	
 	px.mu.Unlock()
 
 	ins.MuA.Lock()
@@ -72,9 +65,21 @@ func (px *Paxos) HandleDecided(req *DecidedReqArgs, res *DecidedResArgs) error {
 
 	px.mu.Lock()
 
-	ins := px.getInstance(req.Seq)
-	//px.dones[px.me] = req.Done
-	res.Done = px.dones[px.me]
+	seq := req.Seq
+	ins, ok := px.instances[seq]
+
+	if !ok {
+		ins = new(instance)
+		ins.Decided = true
+		ins.N_p = req.N
+		ins.N_a = req.N
+		ins.V_a = req.V
+		px.instances[seq] = ins
+	} else {
+		ins.Decided = true
+	}
+
+	px.dones[req.DoneMe] = req.Dones[req.DoneMe]
 
 	px.mu.Unlock()
 
