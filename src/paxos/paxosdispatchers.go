@@ -111,6 +111,7 @@ func (px *Paxos) sendDecision(seq int, v_ interface{}) {
 
 	me := px.me
 	peers := px.peers
+	dones := px.dones
 
 	px.mu.Unlock()
 
@@ -128,8 +129,15 @@ func (px *Paxos) sendDecision(seq int, v_ interface{}) {
 			call(peers[i], "Paxos.HandleDecided", decReqArgs, decResArgs)
 		}
 
-		//if dones[i] < decResArgs.Done {
-		//	dones[i] = decResArgs.Done
-		//}
+		if dones[i] < decResArgs.Done {
+			dones[i] = decResArgs.Done
+		}
+	}
+	
+	stat, _ := px.Status(seq)
+	if (stat == Decided) {//while not decided
+		return 
+	} else {
+		px.proposer(seq)
 	}
 }

@@ -8,11 +8,16 @@ import "fmt"
 import "crypto/rand"
 import "math/big"
 
+import "strconv"
+
 type Clerk struct {
 	mu     sync.Mutex // one RPC at a time
 	sm     *shardmaster.Clerk
 	config shardmaster.Config
 	// You'll have to modify Clerk.
+
+	Me string
+	
 }
 
 func nrand() int64 {
@@ -26,6 +31,8 @@ func MakeClerk(shardmasters []string) *Clerk {
 	ck := new(Clerk)
 	ck.sm = shardmaster.MakeClerk(shardmasters)
 	// You'll have to modify MakeClerk.
+	
+	ck.Me = strconv.FormatInt(nrand(), 10)
 	return ck
 }
 
@@ -87,6 +94,7 @@ func (ck *Clerk) Get(key string) string {
 	defer ck.mu.Unlock()
 
 	// You'll have to modify Get().
+	timestamp := strconv.FormatInt(time.Now().UnixNano(), 10)
 
 	for {
 		shard := key2shard(key)
@@ -98,7 +106,14 @@ func (ck *Clerk) Get(key string) string {
 		if ok {
 			// try each server in the shard's replication group.
 			for _, srv := range servers {
-				args := &GetArgs{}
+				args := &GetArgs {
+					Key : key,
+					Op  : "Get",
+					Me	: ck.Me,
+					Ts	: timestamp,
+					Index: ck.config.Num,
+				}
+				
 				args.Key = key
 				var reply GetReply
 				ok := call(srv, "ShardKV.Get", args, &reply)
@@ -116,6 +131,7 @@ func (ck *Clerk) Get(key string) string {
 		// ask master for a new configuration.
 		ck.config = ck.sm.Query(-1)
 	}
+	return ""
 }
 
 // send a Put or Append request.
@@ -124,6 +140,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 	defer ck.mu.Unlock()
 
 	// You'll have to modify PutAppend().
+	timestamp := strconv.FormatInt(time.Now().UnixNano(), 10)
 
 	for {
 		shard := key2shard(key)
@@ -135,10 +152,15 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		if ok {
 			// try each server in the shard's replication group.
 			for _, srv := range servers {
-				args := &PutAppendArgs{}
-				args.Key = key
-				args.Value = value
-				args.Op = op
+				args := &PutAppendArgs{
+					Key : key,
+					Value: value,
+					Op	: op,
+					Me : ck.Me,
+					Ts	: timestamp,
+					Index: ck.config.Num,
+				}
+				
 				var reply PutAppendReply
 				ok := call(srv, "ShardKV.PutAppend", args, &reply)
 				if ok && reply.Err == OK {

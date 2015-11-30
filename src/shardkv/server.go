@@ -26,7 +26,14 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 
 
 type Op struct {
-	// Your definitions here.
+	Key string	
+	Value string
+	Op string
+	Ts string	//time stamp of the operation
+	Me	string	//id of the client
+	Index int	//the index of the config
+	
+	Config shardmaster.Config
 }
 
 
@@ -42,6 +49,10 @@ type ShardKV struct {
 	gid int64 // my replica group ID
 
 	// Your definitions here.
+	Me string // client id
+	config shardmaster.Config
+	index int
+	seq int
 }
 
 

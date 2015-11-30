@@ -51,7 +51,6 @@ func ndecided(t *testing.T, pxa []*Paxos, seq int) int {
 func waitn(t *testing.T, pxa []*Paxos, seq int, wanted int) {
 	to := 10 * time.Millisecond
 	for iters := 0; iters < 30; iters++ {
-		DPrintf("waiting", ndecided(t, pxa, seq), wanted)
 		if ndecided(t, pxa, seq) >= wanted {
 			break
 		}

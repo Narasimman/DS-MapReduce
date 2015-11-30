@@ -31,13 +31,12 @@ func (px *Paxos) HandlePrepare(req *PrepareReqArgs, res *PrepareRespArgs) error 
 	//Check the incoming prepare request and accept or reject
 	if req.N > ins.N_p {
 		ins.N_p = req.N
-		res.N_a = ins.N_a
-		res.V_a = ins.V_a
-		res.OK = true
-	} else {
-		res.OK = false
 	}
-
+	
+	res.N_a = ins.N_a
+	res.V_a = ins.V_a
+	res.OK = true
+	
 	return nil
 }
 
@@ -52,6 +51,8 @@ func (px *Paxos) HandleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
 
 	ins.MuA.Lock()
 	defer ins.MuA.Unlock()
+
+	res.OK = true
 
 	if req.N >= ins.N_p {
 		ins.N_p = req.N
@@ -72,8 +73,8 @@ func (px *Paxos) HandleDecided(req *DecidedReqArgs, res *DecidedResArgs) error {
 	px.mu.Lock()
 
 	ins := px.getInstance(req.Seq)
-//	px.dones[req.DoneMe] = req.Done
-	//res.Done = px.dones[px.me]
+	//px.dones[px.me] = req.Done
+	res.Done = px.dones[px.me]
 
 	px.mu.Unlock()
 

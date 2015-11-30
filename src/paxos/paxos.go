@@ -52,6 +52,7 @@ type Paxos struct {
 	rpcCount   int32 // for testing
 	peers      []string
 	me         int // index into peers[]
+	n_servers 	int
 
 	// Your data here.
 	instances map[int]*instance //map of paxos instances for each sequence
@@ -125,6 +126,7 @@ func (px *Paxos) Start(seq int, v interface{}) {
 	}
 
 	ins := px.getInstance(seq)
+	
 
 	if seq > px.max_known {
 		//update max known
@@ -154,7 +156,7 @@ func (px *Paxos) Start(seq int, v interface{}) {
 }
 
 func (px *Paxos) isMajority(counter int) bool {
-	return (counter > (len(px.peers)/2)+1)
+	return (counter > (px.n_servers)/2)
 }
 
 func (px *Paxos) getInstance(seq int) *instance {
@@ -218,6 +220,8 @@ func (px *Paxos) proposer(seq int) {
 
 	//Now, it's time for send out decision.
 	px.sendDecision(seq, v_)
+
+	
 
 	DPrintf("End of proposer")
 	return
@@ -381,6 +385,7 @@ func Make(peers []string, me int, rpcs *rpc.Server) *Paxos {
 	px.max_known = -1
 	px.done = -1
 	px.dones = make(map[int]int)
+	px.n_servers = len(peers)
 
 	for k := range px.peers {
 		px.dones[k] = -1
