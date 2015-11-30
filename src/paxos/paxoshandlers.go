@@ -39,7 +39,7 @@ func (px *Paxos) HandleAccept(req *AcceptReqArgs, res *AcceptResArgs) error {
 		ins.V_a = req.V
 		px.instances[seq] = ins
 	}
-	
+
 	px.mu.Unlock()
 
 	ins.MuA.Lock()

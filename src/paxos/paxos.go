@@ -52,13 +52,13 @@ type Paxos struct {
 	rpcCount   int32 // for testing
 	peers      []string
 	me         int // index into peers[]
-	n_servers 	int
+	n_servers  int
 
 	// Your data here.
 	instances map[int]*instance //map of paxos instances for each sequence
 	max_known int               //highest sequence known to this peer
 	done      int               //is this peer done?
-	dones     []int      //map of all dones by all paxos peers
+	dones     []int             //map of all dones by all paxos peers
 }
 
 // Debugging
@@ -126,7 +126,6 @@ func (px *Paxos) Start(seq int, v interface{}) {
 	}
 
 	ins := px.getInstance(seq)
-	
 
 	if seq > px.max_known {
 		//update max known
@@ -180,39 +179,39 @@ func (px *Paxos) proposer(seq int, v interface{}) {
 	for {
 		px.mu.Lock()
 		ins, ok := px.instances[seq]
-		
+
 		if !ok {
 			ins = px.getInstance(seq)
 		}
-		
+
 		me := px.me
 		peers := px.peers
 		px.mu.Unlock()
-	
+
 		ins.MuP.Lock()
 		ins.N = int(time.Now().UnixNano())*len(peers) + me + 1
 		instanceNum := ins.N
 		ins.MuP.Unlock()
-	
+
 		// Send Prepare message.
 		// Construct req and res args
 		DPrintf("Send Prepare message...")
-		
+
 		pinged := 0
 		acceptedPrepare := 0
 		max_seen, v_ := -1, v
-	
+
 		for i := range peers {
 			prepReqArgs := &PrepareReqArgs{
-				Seq:  seq,
-				N:    instanceNum,
+				Seq: seq,
+				N:   instanceNum,
 				//Done: done,
-				Me:   me,
+				Me: me,
 			}
-	
+
 			prepResArgs := new(PrepareRespArgs)
 			prepResArgs.OK = false
-		
+
 			ok = false
 			if i == me {
 				err := px.HandlePrepare(prepReqArgs, prepResArgs)
@@ -226,23 +225,23 @@ func (px *Paxos) proposer(seq int, v interface{}) {
 					pinged++
 				}
 			}
-	
+
 			if prepResArgs.OK == true {
 				acceptedPrepare++
-	
+
 				if prepResArgs.N_a > max_seen {
 					max_seen = prepResArgs.N_a
 					v_ = prepResArgs.V_a
 				}
 			}
 		} // for prepare
-		
+
 		if !px.isMajority(acceptedPrepare) {
 			continue
 		}
-		
+
 		acceptedCount := 0
-	
+
 		for i := range peers {
 			accReqArgs := &AcceptReqArgs{
 				Seq: seq,
@@ -257,7 +256,7 @@ func (px *Paxos) proposer(seq int, v interface{}) {
 			} else {
 				call(peers[i], "Paxos.HandleAccept", accReqArgs, accResArgs)
 			}
-	
+
 			if accResArgs.OK == true {
 				acceptedCount++
 			}
@@ -269,11 +268,11 @@ func (px *Paxos) proposer(seq int, v interface{}) {
 
 		for i := range peers {
 			decReqArgs := &DecidedReqArgs{
-				Seq: seq	,
-				N: ins.N,
-				V:   v_,
-				Dones : px.dones,
-				DoneMe : px.me,
+				Seq:    seq,
+				N:      ins.N,
+				V:      v_,
+				Dones:  px.dones,
+				DoneMe: px.me,
 			}
 			decResArgs := new(DecidedResArgs)
 
@@ -284,7 +283,7 @@ func (px *Paxos) proposer(seq int, v interface{}) {
 			}
 		}
 		return
-	}// infinite for
+	} // infinite for
 }
 
 //
@@ -300,7 +299,7 @@ func (px *Paxos) Done(seq int) {
 	if px.done < seq {
 		px.done = seq
 		px.dones[px.me] = seq
-		
+
 		for k, ins := range px.instances {
 			if k <= seq && ins.Decided {
 				delete(px.instances, k)
@@ -359,7 +358,7 @@ func (px *Paxos) Min() int {
 			min = px.dones[i]
 		}
 	}
-	
+
 	DPrintf("Min is : ")
 	DPrintf(min)
 	return min + 1
@@ -373,9 +372,9 @@ func (px *Paxos) Min() int {
 // it should not contact other Paxos peers.
 //
 func (px *Paxos) Status(seq int) (Fate, interface{}) {
-	
+
 	px.mu.Lock()
-	
+
 	if seq < px.Min() {
 		px.mu.Unlock()
 		return Forgotten, nil

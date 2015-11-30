@@ -285,7 +285,6 @@ func TestBasic(t *testing.T) {
 	fmt.Printf("  ... Passed\n")
 }
 
-
 func TestUnreliable(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 
@@ -372,4 +371,3 @@ func TestFreshQuery(t *testing.T) {
 	fmt.Printf("  ... Passed\n")
 	os.Remove(portx)
 }
-

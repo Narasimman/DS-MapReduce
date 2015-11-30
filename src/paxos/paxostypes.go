@@ -45,7 +45,7 @@ type AcceptResArgs struct {
 
 type DecidedReqArgs struct {
 	Seq    int
-	N		int
+	N      int
 	V      interface{}
 	Dones  []int
 	DoneMe int
