@@ -54,7 +54,6 @@ type Paxos struct {
 	me         int // index into peers[]
 	n_servers  int
 
-	// Your data here.
 	instances map[int]*instance //map of paxos instances for each sequence
 	max_known int               //highest sequence known to this peer
 	done      int               //is this peer done?
@@ -205,8 +204,7 @@ func (px *Paxos) proposer(seq int, v interface{}) {
 			prepReqArgs := &PrepareReqArgs{
 				Seq: seq,
 				N:   instanceNum,
-				//Done: done,
-				Me: me,
+				Me:  me,
 			}
 
 			prepResArgs := new(PrepareRespArgs)
@@ -217,7 +215,6 @@ func (px *Paxos) proposer(seq int, v interface{}) {
 				err := px.HandlePrepare(prepReqArgs, prepResArgs)
 				if err == nil {
 					pinged++
-					ok = true
 				}
 			} else {
 				ok = call(peers[i], "Paxos.HandlePrepare", prepReqArgs, prepResArgs)
@@ -237,10 +234,14 @@ func (px *Paxos) proposer(seq int, v interface{}) {
 		} // for prepare
 
 		if !px.isMajority(acceptedPrepare) {
+			if !px.isMajority(pinged) {
+				time.Sleep(20 * time.Millisecond)
+			}
 			continue
 		}
 
 		acceptedCount := 0
+		pinged = 0
 
 		for i := range peers {
 			accReqArgs := &AcceptReqArgs{
@@ -252,9 +253,15 @@ func (px *Paxos) proposer(seq int, v interface{}) {
 			accResArgs.OK = false
 
 			if i == me {
-				px.HandleAccept(accReqArgs, accResArgs)
+				err := px.HandleAccept(accReqArgs, accResArgs)
+				if err == nil {
+					pinged++
+				}
 			} else {
-				call(peers[i], "Paxos.HandleAccept", accReqArgs, accResArgs)
+				ok = call(peers[i], "Paxos.HandleAccept", accReqArgs, accResArgs)
+				if ok {
+					pinged++
+				}
 			}
 
 			if accResArgs.OK == true {
@@ -263,6 +270,9 @@ func (px *Paxos) proposer(seq int, v interface{}) {
 		}
 
 		if !px.isMajority(acceptedCount) {
+			if !px.isMajority(pinged) {
+				time.Sleep(20 * time.Millisecond)
+			}
 			continue
 		}
 

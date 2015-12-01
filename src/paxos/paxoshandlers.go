@@ -70,15 +70,12 @@ func (px *Paxos) HandleDecided(req *DecidedReqArgs, res *DecidedResArgs) error {
 
 	if !ok {
 		ins = new(instance)
-		ins.Decided = true
 		ins.N_p = req.N
 		ins.N_a = req.N
 		ins.V_a = req.V
 		px.instances[seq] = ins
-	} else {
-		ins.Decided = true
 	}
-
+	
 	px.dones[req.DoneMe] = req.Dones[req.DoneMe]
 
 	px.mu.Unlock()
