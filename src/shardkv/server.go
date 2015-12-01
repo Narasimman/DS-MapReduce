@@ -14,6 +14,13 @@ import "encoding/gob"
 import "math/rand"
 import "shardmaster"
 
+const (
+	Get         = "Get"
+	Put         = "Put"
+	Append      = "Append"
+	GetData     = "GetData"
+	Reconfigure = "Reconfigure"
+)
 
 const Debug = 0
 
@@ -24,18 +31,18 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 	return
 }
 
-
 type Op struct {
-	Key string	
+	Key   string
 	Value string
-	Op string
-	Ts string	//time stamp of the operation
-	Me	string	//id of the client
-	Index int	//the index of the config
-	
-	Config shardmaster.Config
-}
+	Op    string
+	Ts    string //time stamp of the operation
+	Me    string //id of the client
+	Index int    //the index of the config
 
+	Config    shardmaster.Config
+	Datastore map[string]string
+	Logs      map[string]string
+}
 
 type ShardKV struct {
 	mu         sync.Mutex
@@ -49,15 +56,52 @@ type ShardKV struct {
 	gid int64 // my replica group ID
 
 	// Your definitions here.
-	Me string // client id
-	config shardmaster.Config
-	index int
-	seq int
+	Me        string // client id
+	config    shardmaster.Config
+	index     int
+	seq       int
+	datastore map[string]string
+	logs      map[string]string
 }
-
 
 func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 	// Your code here.
+
+	if args.Index > kv.config.Num {
+		reply.Err = ErrIndex
+		return nil
+	}
+
+	kv.mu.Lock()
+	kv.mu.Unlock()
+
+	op := Op{
+		Index: args.Index,
+		Key:   args.Key,
+		Op:    args.Op,
+		Me:    args.Me,
+		Ts:    args.Ts,
+	}
+
+	kv.updateDb(op)
+
+	shard := key2shard(args.Key)
+
+	if kv.config.Shards[shard] != kv.gid {
+		reply.Err = ErrWrongGroup
+		return nil
+	}
+
+	val, exists := kv.datastore[args.Key]
+
+	if exists == false {
+		reply.Err = ErrNoKey
+
+	} else {
+		reply.Err = OK
+		reply.Value = val
+	}
+
 	return nil
 }
 
@@ -120,12 +164,15 @@ func StartServer(gid int64, shardmasters []string,
 
 	// Your initialization code here.
 	// Don't call Join().
+	kv.config = shardmaster.Config{Num: -1}
+	kv.datastore = make(map[string]string)
+	kv.logs = make(map[string]string)
+	kv.seq = 0
 
 	rpcs := rpc.NewServer()
 	rpcs.Register(kv)
 
 	kv.px = paxos.Make(servers, me, rpcs)
-
 
 	os.Remove(servers[me])
 	l, e := net.Listen("unix", servers[me])

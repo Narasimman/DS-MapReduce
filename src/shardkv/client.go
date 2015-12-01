@@ -17,7 +17,6 @@ type Clerk struct {
 	// You'll have to modify Clerk.
 
 	Me string
-	
 }
 
 func nrand() int64 {
@@ -31,7 +30,7 @@ func MakeClerk(shardmasters []string) *Clerk {
 	ck := new(Clerk)
 	ck.sm = shardmaster.MakeClerk(shardmasters)
 	// You'll have to modify MakeClerk.
-	
+
 	ck.Me = strconv.FormatInt(nrand(), 10)
 	return ck
 }
@@ -106,14 +105,14 @@ func (ck *Clerk) Get(key string) string {
 		if ok {
 			// try each server in the shard's replication group.
 			for _, srv := range servers {
-				args := &GetArgs {
-					Key : key,
-					Op  : "Get",
-					Me	: ck.Me,
-					Ts	: timestamp,
+				args := &GetArgs{
+					Key:   key,
+					Op:    "Get",
+					Me:    ck.Me,
+					Ts:    timestamp,
 					Index: ck.config.Num,
 				}
-				
+
 				args.Key = key
 				var reply GetReply
 				ok := call(srv, "ShardKV.Get", args, &reply)
@@ -153,14 +152,14 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 			// try each server in the shard's replication group.
 			for _, srv := range servers {
 				args := &PutAppendArgs{
-					Key : key,
+					Key:   key,
 					Value: value,
-					Op	: op,
-					Me : ck.Me,
-					Ts	: timestamp,
+					Op:    op,
+					Me:    ck.Me,
+					Ts:    timestamp,
 					Index: ck.config.Num,
 				}
-				
+
 				var reply PutAppendReply
 				ok := call(srv, "ShardKV.PutAppend", args, &reply)
 				if ok && reply.Err == OK {
