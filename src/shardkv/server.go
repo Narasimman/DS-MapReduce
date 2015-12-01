@@ -75,6 +75,13 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 	kv.mu.Lock()
 	kv.mu.Unlock()
 
+	shard := key2shard(args.Key)
+
+	if kv.config.Shards[shard] != kv.gid {
+		reply.Err = ErrWrongGroup
+		return nil
+	}
+
 	op := Op{
 		Index: args.Index,
 		Key:   args.Key,
@@ -83,14 +90,7 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 		Ts:    args.Ts,
 	}
 
-	kv.updateDb(op)
-
-	shard := key2shard(args.Key)
-
-	if kv.config.Shards[shard] != kv.gid {
-		reply.Err = ErrWrongGroup
-		return nil
-	}
+	kv.requestDatastore(op)
 
 	val, exists := kv.datastore[args.Key]
 
@@ -108,6 +108,34 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 // RPC handler for client Put and Append requests
 func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	// Your code here.
+	if args.Index > kv.config.Num {
+		reply.Err = ErrIndex
+		return nil
+	}
+
+	kv.mu.Lock()
+	kv.mu.Unlock()
+
+	shard := key2shard(args.Key)
+
+	if kv.config.Shards[shard] != kv.gid {
+		reply.Err = ErrWrongGroup
+		return nil
+	}
+	
+	op := Op{
+		Index: args.Index,
+		Key:   args.Key,
+		Value : args.Value,
+		Op:    args.Op,
+		Me:    args.Me,
+		Ts:    args.Ts,
+	}
+
+	kv.requestDatastore(op)
+
+	reply.Err = OK
+	
 	return nil
 }
 
