@@ -1,8 +1,5 @@
 package shardmaster
 
-/*
-
- */
 func (sm *ShardMaster) JoinHandler(gid int64, servers []string) {
 	config := sm.GetNextConfig()
 
@@ -39,7 +36,12 @@ return num config otherwise
 func (sm *ShardMaster) QueryHandler(num int) Config {
 	if num == -1 {
 		config := sm.configs[sm.configNum]
-		sm.isValidConfig(config)
+		
+		if len(config.Groups) < 1 {
+			//Should we throw an error here???
+			return Config{}
+		}
+		
 		return config
 	} else {
 		return sm.configs[num]

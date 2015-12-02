@@ -22,7 +22,7 @@ const (
 	Reconfigure = "Reconfigure"
 )
 
-const Debug = 0
+const Debug = 1
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
 	if Debug > 0 {
@@ -64,9 +64,75 @@ type ShardKV struct {
 	logs      map[string]string
 }
 
+func (kv *ShardKV) RequestDatastore(op Op) {
+	for {// loop until paxos succeed
+		if op.Op == Reconfigure {
+			if op.Config.Num <= kv.config.Num {
+				return
+			}
+		}
+		
+		if op.Op != GetData {
+			//check for valid group id and timestamp validation
+			
+		}
+		
+		kv.seq++
+		kv.px.Start(kv.seq,op)
+		to := 10 * time.Millisecond
+		res := Op{}
+		
+		for {//wait for paxos majority
+			status, val := kv.px.Status(kv.seq)
+			
+			if status == paxos.Decided {
+				res = val.(Op)
+				break
+			}
+			
+			time.Sleep(to)
+			
+			if to < 10 * time.Second {
+				to = to * 2
+			}
+		}
+		
+		kv.UpdateDatastore(res)
+		kv.px.Done(kv.seq)
+		
+		if res.Ts == op.Ts {
+			return
+		}
+		
+		
+		
+	}// infinite for to loop until paxos decides
+}
+
+func (kv *ShardKV) UpdateDatastore(op Op) {
+	
+	if op.Op == Put {
+		kv.datastore[op.Key] = op.Value
+		
+		//Update the time stamp, but what will be 
+		
+		kv.logs[op.Me + op.Ts] = op.Ts
+	} else if op.Op  == Append {
+		value := kv.datastore[op.Key]
+		kv.datastore[op.Key] = value + op.Value
+		
+		//Should we update the time stamp here also???
+		
+	}
+	
+	DPrintf("Updating db ", op.Key + " --> " + kv.datastore[op.Key])	
+	
+}
+
 func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 	// Your code here.
 
+	DPrintf("Server: Get operation")
 	if args.Index > kv.config.Num {
 		reply.Err = ErrIndex
 		return nil
@@ -90,13 +156,12 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 		Ts:    args.Ts,
 	}
 
-	kv.requestDatastore(op)
+	kv.RequestDatastore(op)
 
 	val, exists := kv.datastore[args.Key]
 
 	if exists == false {
 		reply.Err = ErrNoKey
-
 	} else {
 		reply.Err = OK
 		reply.Value = val
@@ -108,6 +173,10 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 // RPC handler for client Put and Append requests
 func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	// Your code here.
+	
+	DPrintf("Server: Put/Append operation")
+	DPrintf("index in put", args.Index)
+	DPrintf("config num in put", kv.config.Num)
 	if args.Index > kv.config.Num {
 		reply.Err = ErrIndex
 		return nil
@@ -124,15 +193,15 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	}
 	
 	op := Op{
-		Index: args.Index,
-		Key:   args.Key,
-		Value : args.Value,
-		Op:    args.Op,
-		Me:    args.Me,
-		Ts:    args.Ts,
+		Index	: args.Index,
+		Key		: args.Key,
+		Value 	: args.Value,
+		Op		: args.Op,
+		Me		: args.Me,
+		Ts		: args.Ts,
 	}
 
-	kv.requestDatastore(op)
+	kv.RequestDatastore(op)
 
 	reply.Err = OK
 	
@@ -144,6 +213,11 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 // if so, re-configure.
 //
 func (kv *ShardKV) tick() {
+	config := kv.sm.Query(-1)
+	
+	//if(kv.config.Num == -1) {
+		kv.config = config
+	//}
 }
 
 // tell the server to shut itself down.
@@ -196,6 +270,7 @@ func StartServer(gid int64, shardmasters []string,
 	kv.datastore = make(map[string]string)
 	kv.logs = make(map[string]string)
 	kv.seq = 0
+	kv.index = -1
 
 	rpcs := rpc.NewServer()
 	rpcs.Register(kv)

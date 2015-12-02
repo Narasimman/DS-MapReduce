@@ -162,6 +162,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 
 				var reply PutAppendReply
 				ok := call(srv, "ShardKV.PutAppend", args, &reply)
+				
 				if ok && reply.Err == OK {
 					return
 				}

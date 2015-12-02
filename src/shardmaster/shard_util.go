@@ -2,7 +2,6 @@ package shardmaster
 
 import (
 	"fmt"
-	"os"
 	"paxos"
 )
 
@@ -89,12 +88,14 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 	config := &sm.configs[sm.configNum]
 	i := 0
 
+	shardsPerGroup := NShards/len(config.Groups)
+
 	for {
 		if operation == LeaveOp {
-			DPrintf("Rebalance shard for leave operation")
 			shard := GetShard(gid, config)
 
 			if shard == -1 {
+				DPrintf("Shards redistributed")
 				break
 			}
 
@@ -102,8 +103,8 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 			config.Shards[shard] = group
 
 		} else if operation == JoinOp {
-			DPrintf("Rebalance operation for Join Operation")
-			if i == NShards/len(config.Groups) {
+			if i == shardsPerGroup {
+				DPrintf("Shards redistributed after join")
 				break
 			}
 
@@ -180,27 +181,6 @@ func (sm *ShardMaster) RequestOp(op Op) Config {
 
 		if res.UUID == op.UUID {
 			return config
-		}
-	}
-}
-
-/*
-If a shard has a group id that is not there in the config groups, then it's an
-unallocated shard. So, exit the program
-*/
-func (sm *ShardMaster) isValidConfig(config Config) {
-	if len(config.Groups) < 1 {
-		return
-	}
-
-	DPrintf(config.Groups)
-
-	for _, gid := range config.Shards {
-		_, exists := config.Groups[gid]
-
-		if !exists {
-			fmt.Println("Invalid Configuration")
-			os.Exit(-1)
 		}
 	}
 }

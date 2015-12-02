@@ -94,7 +94,7 @@ func (mr *MapReduce) RunMaster() *list.List {
 				ok = makeRPCcall(worker, index, Reduce)
 
 				if ok {
-				ok = makeRPCcall(worker, index, Reduce)
+					ok = makeRPCcall(worker, index, Reduce)
 					reducechannel <- index
 					mr.freePoolChannel <- worker
 					return

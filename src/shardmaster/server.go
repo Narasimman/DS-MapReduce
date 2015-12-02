@@ -37,7 +37,7 @@ type Op struct {
 }
 
 // Debugging
-const Debug = 0
+const Debug = 1
 
 func DPrintf(a ...interface{}) (n int, err error) {
 	if Debug > 0 {
@@ -76,7 +76,6 @@ func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
 	}
 
 	sm.RequestOp(op)
-	sm.isValidConfig(sm.configs[sm.configNum])
 	return nil
 }
 
@@ -92,8 +91,7 @@ func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) error {
 	}
 
 	sm.RequestOp(op)
-	sm.isValidConfig(sm.configs[sm.configNum])
-
+	
 	return nil
 }
 
@@ -109,7 +107,6 @@ func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) error {
 	}
 
 	sm.RequestOp(op)
-	sm.isValidConfig(sm.configs[sm.configNum])
 	return nil
 }
 
