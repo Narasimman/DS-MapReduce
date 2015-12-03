@@ -27,7 +27,6 @@ type PutAppendArgs struct {
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
 
-	Me    string // client
 	Ts    string // timestamp of the operation
 	Index int    // Config number
 
@@ -42,7 +41,6 @@ type GetArgs struct {
 	Op  string
 	// You'll have to add definitions here.
 
-	Me    string
 	Ts    string
 	Index int
 }
@@ -50,4 +48,15 @@ type GetArgs struct {
 type GetReply struct {
 	Err   Err
 	Value string
+}
+
+type GetShardDataArgs struct {
+	Shard int
+	Index int
+	Me string
+}
+
+type GetShardDataReply struct {
+	Err Err
+	Datastore map[string]string
 }
