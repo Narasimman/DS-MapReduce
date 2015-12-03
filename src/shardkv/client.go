@@ -95,6 +95,7 @@ func (ck *Clerk) Get(key string) string {
 	
 	// You'll have to modify Get().
 	timestamp := strconv.FormatInt(time.Now().UnixNano(), 10)
+	DPrintf("", "Client: Get operation")	
 	
 	for {
 		shard := key2shard(key)
@@ -109,6 +110,7 @@ func (ck *Clerk) Get(key string) string {
 				args := &GetArgs{
 					Key:   key,
 					Op:    "Get",
+					Me:    ck.Me,
 					Ts:    timestamp,
 					Index: ck.config.Num,
 				}
@@ -129,7 +131,6 @@ func (ck *Clerk) Get(key string) string {
 
 		// ask master for a new configuration.
 		ck.config = ck.sm.Query(-1)
-		DPrintf("CLIENT CONFIG NUM", ck.config.Num)
 	}
 	return ""
 }
@@ -156,6 +157,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 					Key:   key,
 					Value: value,
 					Op:    op,
+					Me:    ck.Me,
 					Ts:    timestamp,
 					Index: ck.config.Num,
 				}

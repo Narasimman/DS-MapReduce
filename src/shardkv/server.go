@@ -132,14 +132,18 @@ func (kv *ShardKV) UpdateDatastore(op Op) {
 }
 
 func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
+	DPrintf("Server: Get operation")
+	
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
+	
 	if args.Index > kv.config.Num {
 		reply.Err = ErrIndex
 		return nil
 	}
 
+	
 	shard := key2shard(args.Key)
 
 	if kv.config.Shards[shard] != kv.gid {
@@ -151,6 +155,7 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 		Index: args.Index,
 		Key:   args.Key,
 		Op:    args.Op,
+		Me:    args.Me,
 		Ts:    args.Ts,
 	}
 
@@ -170,7 +175,6 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 // RPC handler for client Put and Append requests
 func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	DPrintf("Server: Put/Append operation")
-	
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 	
@@ -178,6 +182,8 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 		reply.Err = ErrIndex
 		return nil
 	}
+
+	
 
 	shard := key2shard(args.Key)
 
@@ -216,7 +222,9 @@ func (kv *ShardKV) GetShardData(args *GetShardDataArgs, reply *GetShardDataReply
 	}
 	
 	kv.RequestDatastore(req)
+	
 	shard := args.Shard
+	
 	data := make(map[string]string)
 	
 	for k, v := range kv.datastore {
@@ -241,7 +249,7 @@ func (kv *ShardKV) tick() {
 	defer kv.mu.Unlock()
 	
 	config := kv.sm.Query(-1)
-	
+
 	if(kv.config.Num == -1 && config.Num == 1) {
 		kv.config = config
 		return
