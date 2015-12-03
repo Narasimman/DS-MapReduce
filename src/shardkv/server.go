@@ -84,19 +84,19 @@ func (kv *ShardKV) RequestDatastore(op Op) {
 		
 		for {//wait for paxos majority
 			status, val := kv.px.Status(kv.seq)
-			
+
 			if status == paxos.Decided {
 				res = val.(Op)
 				break
 			}
-			
+
 			time.Sleep(to)
-			
+
 			if to < 10 * time.Second {
 				to = to * 2
 			}
 		}
-		
+
 		kv.UpdateDatastore(res)
 		kv.px.Done(kv.seq)
 		
@@ -126,6 +126,7 @@ func (kv *ShardKV) UpdateDatastore(op Op) {
 	}
 	
 	DPrintf("Updating db ", op.Key + " --> " + kv.datastore[op.Key])	
+	DPrintf("", len(kv.datastore))
 	
 }
 
@@ -157,7 +158,7 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 	}
 
 	kv.RequestDatastore(op)
-
+	DPrintf("", len(kv.datastore))
 	val, exists := kv.datastore[args.Key]
 
 	if exists == false {
@@ -173,7 +174,7 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 // RPC handler for client Put and Append requests
 func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	// Your code here.
-	
+
 	DPrintf("Server: Put/Append operation")
 	DPrintf("index in put", args.Index)
 	DPrintf("config num in put", kv.config.Num)
@@ -191,7 +192,7 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 		reply.Err = ErrWrongGroup
 		return nil
 	}
-	
+
 	op := Op{
 		Index	: args.Index,
 		Key		: args.Key,

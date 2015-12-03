@@ -36,13 +36,13 @@ func GetShard(gid int64, config *Config) int {
 
 /*
 This function finds the group that has less and more number of shards
-The group that is light will be used for leave operation
+The group that has less number of shares than typical will be used for leave operation
 	and shards will be added to the light group
-The group that is heavy will be used during join operation
+The group that has more number of shards will be used during join operation
 	and those shards will be added to the new group
 */
 func FindGroupToBalance(config *Config, operation string) int64 {
-	group, l_count, h_count := int64(0), int(^uint(0)>>1), -1
+	group, l_count, j_count := int64(0), int(^uint(0)>>1), -1
 	counts := make(map[int64]int)
 
 	for gid := range config.Groups {
@@ -63,8 +63,8 @@ func FindGroupToBalance(config *Config, operation string) int64 {
 					group = gid
 				}
 			} else if operation == JoinOp {
-				if h_count < counts[gid] {
-					h_count = counts[gid]
+				if j_count < counts[gid] {
+					j_count = counts[gid]
 					group = gid
 				}
 			}
@@ -82,12 +82,11 @@ func FindGroupToBalance(config *Config, operation string) int64 {
 
 /*
 Rebalances the shards
-
 */
 func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 	config := &sm.configs[sm.configNum]
-	i := 0
 
+	i := 0
 	shardsPerGroup := NShards/len(config.Groups)
 
 	for {
@@ -110,7 +109,11 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 
 			group := FindGroupToBalance(config, operation)
 			shard := GetShard(group, config)
-			config.Shards[shard] = gid
+
+			if shard != -1 {
+				config.Shards[shard] = gid
+			}
+
 		} else {
 			DPrintf("Calling rebalancing for invalid operation")
 		}
@@ -126,15 +129,18 @@ func (sm *ShardMaster) GetNextConfig() *Config {
 	newConfig.Groups = make(map[int64][]string)
 	newConfig.Shards = [NShards]int64{}
 
+	//Copy all groups data
 	for gid, servers := range oldConfig.Groups {
 		newConfig.Groups[gid] = servers
 	}
 
+	//copy all shards data
 	for shard, gid := range oldConfig.Shards {
 		newConfig.Shards[shard] = gid
 	}
 
 	sm.configNum++
+	//append the new config
 	sm.configs = append(sm.configs, newConfig)
 	return &sm.configs[sm.configNum]
 }
@@ -147,17 +153,18 @@ func (sm *ShardMaster) CallOp(op Op, seq int) Config {
 
 	gid, servers, shard, num := op.GroupId, op.Servers, op.Shard, op.Num
 	switch op.Type {
-	case JoinOp:
-		sm.JoinHandler(gid, servers)
-	case MoveOp:
-		sm.MoveHandler(shard, gid)
-	case QueryOp:
-		return sm.QueryHandler(num)
-	case LeaveOp:
-		sm.LeaveHandler(gid)
-	default:
-		fmt.Println("Invalid Operation")
+		case JoinOp:
+			sm.JoinHandler(gid, servers)
+		case MoveOp:
+			sm.MoveHandler(shard, gid)
+		case QueryOp:
+			return sm.QueryHandler(num)
+		case LeaveOp:
+			sm.LeaveHandler(gid)
+		default:
+			fmt.Println("Invalid Operation")
 	}
+
 	sm.px.Done(sm.processed)
 	return Config{}
 }
