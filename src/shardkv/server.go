@@ -64,75 +64,82 @@ type ShardKV struct {
 	logs      map[string]string
 }
 
+func (kv *ShardKV) WaitForAgreement(op Op) Op{
+	kv.seq++
+	kv.px.Start(kv.seq, op)
+	to := 10 * time.Millisecond
+	res := Op{}
+		
+	for {//wait for paxos majority
+		status, val := kv.px.Status(kv.seq)
+
+		if status == paxos.Decided {
+			res = val.(Op)
+			break
+		}
+
+		time.Sleep(to)
+	
+		if to < 10 * time.Second {
+			to = to * 2
+		}
+	}
+	return res	
+}
+
+
 func (kv *ShardKV) RequestDatastore(op Op) {
 	for {// loop until paxos succeed
 		if op.Op == Reconfigure {
+			//if the config number is less than the highest seen config
 			if op.Config.Num <= kv.config.Num {
 				return
 			}
 		}
-		
+
 		if op.Op != GetData {
 			//check for valid group id and timestamp validation
+			timestamp, exists := kv.logs[op.Me + op.Op]
+			
+			if exists {
+				//if timestamp in the logs is greater than the current op ts
+				//ignore it.
+				if timestamp >= op.Ts {
+					return
+				}
+			}
+			
+			shard := key2shard(op.Key)
+			if kv.config.Shards[shard] != kv.gid {
+				return
+			}
 			
 		}
 		
-		kv.seq++
-		kv.px.Start(kv.seq,op)
-		to := 10 * time.Millisecond
-		res := Op{}
-		
-		for {//wait for paxos majority
-			status, val := kv.px.Status(kv.seq)
-
-			if status == paxos.Decided {
-				res = val.(Op)
-				break
-			}
-
-			time.Sleep(to)
-
-			if to < 10 * time.Second {
-				to = to * 2
-			}
-		}
-
+		res := kv.WaitForAgreement(op)
 		kv.UpdateDatastore(res)
 		kv.px.Done(kv.seq)
 		
 		if res.Ts == op.Ts {
 			return
 		}
-		
-		
-		
 	}// infinite for to loop until paxos decides
 }
 
-func (kv *ShardKV) UpdateDatastore(op Op) {
-	
+func (kv *ShardKV) UpdateDatastore(op Op) {	
 	if op.Op == Put {
-		kv.datastore[op.Key] = op.Value
+		kv.datastore[op.Key] = op.Value		
 		
-		//Update the time stamp, but what will be 
-		
-		kv.logs[op.Me + op.Ts] = op.Ts
 	} else if op.Op  == Append {
 		value := kv.datastore[op.Key]
 		kv.datastore[op.Key] = value + op.Value
-		
-		//Should we update the time stamp here also???
-		
 	}
-	
-	DPrintf("Updating db ", op.Key + " --> " + kv.datastore[op.Key])	
-	DPrintf("", len(kv.datastore))
-	
+	//log it
+	kv.logs[op.Me + op.Op] = op.Ts
+	DPrintf("Updating db ", op.Key + " --> " + kv.datastore[op.Key])
 }
 
 func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
-	// Your code here.
-
 	DPrintf("Server: Get operation")
 	if args.Index > kv.config.Num {
 		reply.Err = ErrIndex
@@ -173,11 +180,7 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 
 // RPC handler for client Put and Append requests
 func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
-	// Your code here.
-
 	DPrintf("Server: Put/Append operation")
-	DPrintf("index in put", args.Index)
-	DPrintf("config num in put", kv.config.Num)
 	if args.Index > kv.config.Num {
 		reply.Err = ErrIndex
 		return nil
@@ -203,9 +206,7 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	}
 
 	kv.RequestDatastore(op)
-
 	reply.Err = OK
-	
 	return nil
 }
 
@@ -214,11 +215,46 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 // if so, re-configure.
 //
 func (kv *ShardKV) tick() {
+	
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+	
 	config := kv.sm.Query(-1)
 	
-	//if(kv.config.Num == -1) {
+	DPrintf("TICK TICK TICK")
+	
+	if(kv.config.Num == -1) {
 		kv.config = config
-	//}
+	}
+	
+	//else update database until the latest config
+	for i := kv.config.Num + 1; i <= config.Num; i++ {
+		currentConfig := kv.sm.Query(i)
+		
+		u_datastore := make(map[string]string)
+		u_logs	:= make(map[string]string)
+		
+		//for each shard in kv 
+		for shard, old_gid := range kv.config.Shards {
+			new_gid := currentConfig.Shards[shard]
+			
+			if old_gid != new_gid && new_gid == kv.gid {
+				//get data from all the servers of this group
+				for _, server := range kv.config.Groups {
+					
+					
+					
+					
+					
+				}	
+				
+				
+			}
+		}
+		
+		
+	}
+	
 }
 
 // tell the server to shut itself down.
