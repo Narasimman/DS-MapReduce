@@ -91,7 +91,7 @@ func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) error {
 	}
 
 	sm.RequestOp(op)
-	
+
 	return nil
 }
 

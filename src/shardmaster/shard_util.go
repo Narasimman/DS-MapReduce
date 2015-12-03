@@ -87,7 +87,7 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 	config := &sm.configs[sm.configNum]
 
 	i := 0
-	shardsPerGroup := NShards/len(config.Groups)
+	shardsPerGroup := NShards / len(config.Groups)
 
 	for {
 		if operation == LeaveOp {
@@ -153,16 +153,16 @@ func (sm *ShardMaster) CallOp(op Op, seq int) Config {
 
 	gid, servers, shard, num := op.GroupId, op.Servers, op.Shard, op.Num
 	switch op.Type {
-		case JoinOp:
-			sm.JoinHandler(gid, servers)
-		case MoveOp:
-			sm.MoveHandler(shard, gid)
-		case QueryOp:
-			return sm.QueryHandler(num)
-		case LeaveOp:
-			sm.LeaveHandler(gid)
-		default:
-			fmt.Println("Invalid Operation")
+	case JoinOp:
+		sm.JoinHandler(gid, servers)
+	case MoveOp:
+		sm.MoveHandler(shard, gid)
+	case QueryOp:
+		return sm.QueryHandler(num)
+	case LeaveOp:
+		sm.LeaveHandler(gid)
+	default:
+		fmt.Println("Invalid Operation")
 	}
 
 	sm.px.Done(sm.processed)
