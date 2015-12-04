@@ -70,15 +70,17 @@ func (kv *ShardKV) UpdateDatastore(op Op) {
 		for k, v := range op.Datastore {
 			kv.datastore[k] = v
 		}
+	} else {
+		DPrintf("Update datastore", "Invalid operation")
 	}
-	//DPrintf("Updating db ", op.Key + " --> " + kv.datastore[op.Key])
+	DPrintf("Updating db ", op.Key + " --> " + kv.datastore[op.Key])
 }
 
 /*
 Getting the shard data so that it can be added to the
 current configuration during reconfigure operation
 */
-func (kv *ShardKV) GetShardData(args *GetShardDataArgs, reply *GetShardDataReply) error {
+func (kv *ShardKV) GetShardData(args *GetDataArgs, reply *GetDataReply) error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
@@ -87,7 +89,7 @@ func (kv *ShardKV) GetShardData(args *GetShardDataArgs, reply *GetShardDataReply
 		return nil
 	}
 
-	req := Op{
+	req := Op {
 		Op: GetData,
 		Ts: strconv.FormatInt(time.Now().UnixNano(), 10),
 	}
@@ -108,5 +110,4 @@ func (kv *ShardKV) GetShardData(args *GetShardDataArgs, reply *GetShardDataReply
 	reply.Datastore = data
 
 	return nil
-
 }

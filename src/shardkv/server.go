@@ -163,12 +163,12 @@ func (kv *ShardKV) tick() {
 				//get data from all the servers of this group
 				for _, server := range kv.config.Groups[old_gid] {
 
-					args := &GetShardDataArgs{
+					args := &GetDataArgs{
 						Shard: shard,
 						Index: kv.config.Num,
 					}
 
-					reply := &GetShardDataReply{}
+					reply := &GetDataReply{}
 
 					ok := call(server, "ShardKV.GetShardData", args, reply)
 					if ok && reply.Err == OK {

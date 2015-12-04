@@ -132,7 +132,7 @@ func (sm *ShardMaster) GetNextConfig() *Config {
 	newConfig.Groups = make(map[int64][]string)
 	newConfig.Shards = [NShards]int64{}
 
-	//Copy all groups data
+	//Copy all groups data because assigning just gets the reference
 	for gid, servers := range oldConfig.Groups {
 		newConfig.Groups[gid] = servers
 	}

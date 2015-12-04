@@ -51,13 +51,13 @@ type GetReply struct {
 	Value string
 }
 
-type GetShardDataArgs struct {
+type GetDataArgs struct {
 	Shard int
 	Index int
 	Me    string
 }
 
-type GetShardDataReply struct {
+type GetDataReply struct {
 	Err       Err
 	Datastore map[string]string
 	Logs      map[string]string
