@@ -38,7 +38,7 @@ func (sm *ShardMaster) QueryHandler(num int) Config {
 		config := sm.configs[sm.configNum]
 
 		if len(config.Groups) < 1 {
-			//Should we throw an error here???
+			//Should we throw an error here???..not sure. but the cases pass.
 			return Config{}
 		}
 

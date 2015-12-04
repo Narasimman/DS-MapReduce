@@ -37,9 +37,9 @@ func getShard(gid int64, config *Config) int {
 /*
 This function finds the group that has less and more number of shards
 The group that has less number of shares than typical will be used for leave operation
-	and shards will be added to the light group
+and shards will be added to the light group
 The group that has more number of shards will be used during join operation
-	and those shards will be added to the new group
+and those shards will be added to the new group
 */
 func findGroupToBalance(config *Config, operation string) int64 {
 	group, l_count, j_count := int64(0), int(^uint(0)>>1), -1
@@ -71,6 +71,7 @@ func findGroupToBalance(config *Config, operation string) int64 {
 		}
 	}
 
+	// if the group id is 0 then return 0 and not the max/min
 	for _, gid := range config.Shards {
 		if gid == 0 {
 			group = 0
@@ -90,7 +91,10 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 	shardsPerGroup := NShards / len(config.Groups)
 
 	for {
+		group := findGroupToBalance(config, operation)
 		if operation == LeaveOp {
+			//if leaving get shard from that group and 
+			// distribute it to the light group
 			shard := getShard(gid, config)
 
 			if shard == -1 {
@@ -98,22 +102,19 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 				break
 			}
 
-			group := findGroupToBalance(config, operation)
 			config.Shards[shard] = group
 
 		} else if operation == JoinOp {
-			if i == shardsPerGroup {
-				DPrintf("Shards redistributed after join")
+			if i < shardsPerGroup {
+				shard := getShard(group, config)
+
+				if shard != -1 {
+					config.Shards[shard] = gid
+				}
+			} else {
+				// we are done redistributing
 				break
 			}
-
-			group := findGroupToBalance(config, operation)
-			shard := getShard(group, config)
-
-			if shard != -1 {
-				config.Shards[shard] = gid
-			}
-
 		} else {
 			DPrintf("Calling rebalancing for invalid operation")
 		}
@@ -149,8 +150,6 @@ func (sm *ShardMaster) GetNextConfig() *Config {
 Calls the corresponding handler based on op arguments.
 */
 func (sm *ShardMaster) CallOp(op Op, seq int) Config {
-	sm.processed++
-
 	gid, servers, shard, num := op.GroupId, op.Servers, op.Shard, op.Num
 	switch op.Type {
 	case JoinOp:
@@ -173,7 +172,8 @@ func (sm *ShardMaster) RequestOp(op Op) Config {
 	// Loop until paxos gives a decision
 	for {
 		//DPrintf("Looping until paxos gives a decision")
-		seq := sm.processed + 1
+		sm.processed++
+		seq := sm.processed
 		decided, val := sm.px.Status(seq)
 		var res Op
 
