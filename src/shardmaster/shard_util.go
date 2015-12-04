@@ -86,11 +86,9 @@ Rebalances the shards
 */
 func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 	config := &sm.configs[sm.configNum]
-
-	i := 0
 	shardsPerGroup := NShards / len(config.Groups)
 
-	for {
+	for i:=0;;i++ {
 		group := findGroupToBalance(config, operation)
 		if operation == LeaveOp {
 			//if leaving get shard from that group and
@@ -120,7 +118,6 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 		} else {
 			DPrintf("Calling rebalancing for invalid operation")
 		}
-		i++
 	}
 }
 

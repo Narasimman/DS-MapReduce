@@ -34,16 +34,12 @@ Return the highest known configuration if num is negative
 return num config otherwise
 */
 func (sm *ShardMaster) QueryHandler(num int) Config {
-	if num == -1 {
-		config := sm.configs[sm.configNum]
-
-		if len(config.Groups) < 1 {
-			//Should we throw an error here???..not sure. but the cases pass.
-			return Config{}
-		}
-
-		return config
+	config := Config{}
+	if num >=  0 {
+		config = sm.configs[num]
 	} else {
-		return sm.configs[num]
+		//Return the latest configuration
+		config = sm.configs[sm.configNum]
 	}
+	return config
 }
