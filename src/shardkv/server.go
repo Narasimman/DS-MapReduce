@@ -39,7 +39,6 @@ type Op struct {
 	Value string
 	Op    string
 	Ts    string //time stamp of the operation
-	Me    string //id of the client
 	Index int    //the index of the config
 
 	Config    shardmaster.Config
@@ -92,6 +91,7 @@ func (kv *ShardKV) RequestDatastore(op Op) {
 		if op.Op == Reconfigure {
 			//if the config number is less than the highest seen config
 			if op.Config.Num <= kv.config.Num {
+				DPrintf("wrong: ", "current operation config is less than highest seen")
 				return
 			}
 		} else if op.Op != GetData {
@@ -114,6 +114,10 @@ func (kv *ShardKV) RequestDatastore(op Op) {
 	} // infinite for to loop until paxos decides
 }
 
+/*
+The core function to update the data store.
+
+*/
 func (kv *ShardKV) UpdateDatastore(op Op) {
 	if op.Op == Put {
 		kv.datastore[op.Key] = op.Value
@@ -121,6 +125,7 @@ func (kv *ShardKV) UpdateDatastore(op Op) {
 		value := kv.datastore[op.Key]
 		kv.datastore[op.Key] = value + op.Value
 	} else if op.Op == Reconfigure {
+		DPrintf("Reconfigure in updatedatastore: ", "copying datastore")
 		kv.config = op.Config
 		for k, v := range op.Datastore {
 			kv.datastore[k] = v
@@ -151,7 +156,6 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 		Index: args.Index,
 		Key:   args.Key,
 		Op:    args.Op,
-		Me:    args.Me,
 		Ts:    args.Ts,
 	}
 
@@ -161,7 +165,7 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 	if exists == false {
 		reply.Err = ErrNoKey
 	} else {
-		DPrintf("GETTTT", "GET SUCCESSSS")
+		DPrintf("GET: ", "GET SUCCESS")
 		reply.Err = OK
 		reply.Value = val
 	}
@@ -199,6 +203,10 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	return nil
 }
 
+/*
+Getting the shard data so that it can be added to the
+current configuration during reconfigure operation
+*/
 func (kv *ShardKV) GetShardData(args *GetShardDataArgs, reply *GetShardDataReply) error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
@@ -244,15 +252,17 @@ func (kv *ShardKV) tick() {
 	config := kv.sm.Query(-1)
 
 	if kv.config.Num == -1 && config.Num == 1 {
+		DPrintf("Tick:", "Initial reconfiguration")
 		kv.config = config
 		return
 	}
 
 	//else update database until the latest config
 	for i := kv.config.Num + 1; i <= config.Num; i++ {
+
 		currentConfig := kv.sm.Query(i)
 
-		u_datastore := map[string]string{}
+		new_datastore := map[string]string{}
 
 		//for each shard in kv
 		for shard, old_gid := range kv.config.Shards {
@@ -271,21 +281,20 @@ func (kv *ShardKV) tick() {
 					ok := call(server, "ShardKV.GetShardData", args, reply)
 					if ok && reply.Err == OK {
 						for k, v := range reply.Datastore {
-							u_datastore[k] = v
+							new_datastore[k] = v
 						}
 					}
 				}
 			}
-		}
+		} //for each shard
 
-		timestamp := strconv.FormatInt(time.Now().UnixNano(), 10)
 		req := Op{
 			Op: Reconfigure,
-			Ts: timestamp,
+			Ts: strconv.FormatInt(time.Now().UnixNano(), 10),
 
 			Index:     i,
 			Config:    currentConfig,
-			Datastore: u_datastore,
+			Datastore: new_datastore,
 		}
 		kv.RequestDatastore(req)
 	} //outer for
