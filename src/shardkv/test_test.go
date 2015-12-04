@@ -346,7 +346,8 @@ func doConcurrent(t *testing.T, unreliable bool) {
 		}
 	}
 }
-/*
+
+
 func TestConcurrent(t *testing.T) {
 	fmt.Printf("Test: Concurrent Put/Get/Move ...\n")
 	doConcurrent(t, false)
@@ -358,4 +359,4 @@ func TestConcurrentUnreliable(t *testing.T) {
 	doConcurrent(t, true)
 	fmt.Printf("  ... Passed\n")
 }
-*/
+

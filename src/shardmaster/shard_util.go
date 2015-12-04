@@ -25,7 +25,7 @@ func nrand() int64 {
 /*
 Returns the shard for a given group id and config.
 */
-func GetShard(gid int64, config *Config) int {
+func getShard(gid int64, config *Config) int {
 	for shard, g := range config.Shards {
 		if gid == g {
 			return shard
@@ -41,7 +41,7 @@ The group that has less number of shares than typical will be used for leave ope
 The group that has more number of shards will be used during join operation
 	and those shards will be added to the new group
 */
-func FindGroupToBalance(config *Config, operation string) int64 {
+func findGroupToBalance(config *Config, operation string) int64 {
 	group, l_count, j_count := int64(0), int(^uint(0)>>1), -1
 	counts := make(map[int64]int)
 
@@ -91,14 +91,14 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 
 	for {
 		if operation == LeaveOp {
-			shard := GetShard(gid, config)
+			shard := getShard(gid, config)
 
 			if shard == -1 {
 				DPrintf("Shards redistributed")
 				break
 			}
 
-			group := FindGroupToBalance(config, operation)
+			group := findGroupToBalance(config, operation)
 			config.Shards[shard] = group
 
 		} else if operation == JoinOp {
@@ -107,8 +107,8 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 				break
 			}
 
-			group := FindGroupToBalance(config, operation)
-			shard := GetShard(group, config)
+			group := findGroupToBalance(config, operation)
+			shard := getShard(group, config)
 
 			if shard != -1 {
 				config.Shards[shard] = gid
@@ -164,8 +164,6 @@ func (sm *ShardMaster) CallOp(op Op, seq int) Config {
 	default:
 		fmt.Println("Invalid Operation")
 	}
-
-	sm.px.Done(sm.processed)
 	return Config{}
 }
 
@@ -178,13 +176,16 @@ func (sm *ShardMaster) RequestOp(op Op) Config {
 		seq := sm.processed + 1
 		decided, val := sm.px.Status(seq)
 		var res Op
+
 		if decided == paxos.Decided {
 			res = val.(Op)
 		} else {
 			sm.px.Start(seq, op)
 			res = sm.WaitOnAgreement(seq)
 		}
+
 		config := sm.CallOp(res, seq)
+		sm.px.Done(sm.processed)
 
 		if res.UUID == op.UUID {
 			return config

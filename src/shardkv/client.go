@@ -91,12 +91,11 @@ func key2shard(key string) int {
 func (ck *Clerk) Get(key string) string {
 	ck.mu.Lock()
 	defer ck.mu.Unlock()
-	
-	
+
 	// You'll have to modify Get().
 	timestamp := strconv.FormatInt(time.Now().UnixNano(), 10)
-	DPrintf("", "Client: Get operation")	
-	
+	DPrintf("", "Client: Get operation")
+
 	for {
 		shard := key2shard(key)
 
@@ -164,7 +163,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 
 				var reply PutAppendReply
 				ok := call(srv, "ShardKV.PutAppend", args, &reply)
-				
+
 				if ok && reply.Err == OK {
 					return
 				}

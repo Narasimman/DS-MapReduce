@@ -64,13 +64,13 @@ type ShardKV struct {
 	datastore map[string]string
 }
 
-func (kv *ShardKV) WaitForAgreement(op Op) Op{
+func (kv *ShardKV) WaitForAgreement(op Op) Op {
 	kv.seq++
 	kv.px.Start(kv.seq, op)
 	to := 10 * time.Millisecond
 	res := Op{}
-		
-	for {//wait for paxos majority
+
+	for { //wait for paxos majority
 		status, val := kv.px.Status(kv.seq)
 
 		if status == paxos.Decided {
@@ -79,71 +79,67 @@ func (kv *ShardKV) WaitForAgreement(op Op) Op{
 		}
 
 		time.Sleep(to)
-	
-		if to < 10 * time.Second {
+
+		if to < 10*time.Second {
 			to = to * 2
 		}
 	}
-	return res	
+	return res
 }
 
-
 func (kv *ShardKV) RequestDatastore(op Op) {
-	for {// loop until paxos succeed
+	for { // loop until paxos succeed
 		if op.Op == Reconfigure {
 			//if the config number is less than the highest seen config
 			if op.Config.Num <= kv.config.Num {
 				return
 			}
-		} else if op.Op == GetData {
-		} else {			
+		} else if op.Op != GetData {
 			shard := key2shard(op.Key)
-			
+
 			if kv.config.Shards[shard] != kv.gid {
-				DPrintf("paxos group:  " , "wrong group")
+				DPrintf("paxos group:  ", "wrong group")
 				return
 			}
-			
+
 		}
-		
+
 		res := kv.WaitForAgreement(op)
 		kv.UpdateDatastore(res)
 		kv.px.Done(kv.seq)
-		
+
 		if res.Ts == op.Ts {
 			return
 		}
-	}// infinite for to loop until paxos decides
+	} // infinite for to loop until paxos decides
 }
 
-func (kv *ShardKV) UpdateDatastore(op Op) {	
+func (kv *ShardKV) UpdateDatastore(op Op) {
 	if op.Op == Put {
-		kv.datastore[op.Key] = op.Value		
-	} else if op.Op  == Append {
+		kv.datastore[op.Key] = op.Value
+	} else if op.Op == Append {
 		value := kv.datastore[op.Key]
 		kv.datastore[op.Key] = value + op.Value
 	} else if op.Op == Reconfigure {
 		kv.config = op.Config
 		for k, v := range op.Datastore {
 			kv.datastore[k] = v
-		}		
+		}
 	}
 	//DPrintf("Updating db ", op.Key + " --> " + kv.datastore[op.Key])
 }
 
 func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 	DPrintf("Server: Get operation")
-	
+
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
-	
 	if args.Index > kv.config.Num {
 		reply.Err = ErrIndex
 		return nil
 	}
 
-	
 	shard := key2shard(args.Key)
 
 	if kv.config.Shards[shard] != kv.gid {
@@ -177,13 +173,11 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	DPrintf("Server: Put/Append operation")
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
-	
+
 	if args.Index > kv.config.Num {
 		reply.Err = ErrIndex
 		return nil
 	}
-
-	
 
 	shard := key2shard(args.Key)
 
@@ -193,11 +187,11 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	}
 
 	op := Op{
-		Index	: args.Index,
-		Key		: args.Key,
-		Value 	: args.Value,
-		Op		: args.Op,
-		Ts		: args.Ts,
+		Index: args.Index,
+		Key:   args.Key,
+		Value: args.Value,
+		Op:    args.Op,
+		Ts:    args.Ts,
 	}
 
 	kv.RequestDatastore(op)
@@ -205,97 +199,96 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	return nil
 }
 
-
 func (kv *ShardKV) GetShardData(args *GetShardDataArgs, reply *GetShardDataReply) error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
-	
-	
+
 	if args.Index > kv.config.Num {
 		reply.Err = ErrIndex
 		return nil
 	}
-	
+
 	req := Op{
-		Op : GetData,
-		Ts : strconv.FormatInt(time.Now().UnixNano(), 10),
+		Op: GetData,
+		Ts: strconv.FormatInt(time.Now().UnixNano(), 10),
 	}
-	
+
 	kv.RequestDatastore(req)
-	
+
 	shard := args.Shard
-	
+
 	data := make(map[string]string)
-	
+
 	for k, v := range kv.datastore {
 		if key2shard(k) == shard {
 			data[k] = v
 		}
 	}
-		
+
 	reply.Err = OK
 	reply.Datastore = data
-	
+
 	return nil
-	
+
 }
+
 //
 // Ask the shardmaster if there's a new configuration;
 // if so, re-configure.
 //
 func (kv *ShardKV) tick() {
-	
+
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
-	
+
 	config := kv.sm.Query(-1)
 
-	if(kv.config.Num == -1 && config.Num == 1) {
+	if kv.config.Num == -1 && config.Num == 1 {
 		kv.config = config
 		return
 	}
-	
+
 	//else update database until the latest config
 	for i := kv.config.Num + 1; i <= config.Num; i++ {
 		currentConfig := kv.sm.Query(i)
-		
+
 		u_datastore := map[string]string{}
-		
-		//for each shard in kv 
+
+		//for each shard in kv
 		for shard, old_gid := range kv.config.Shards {
 			new_gid := currentConfig.Shards[shard]
 			if old_gid != new_gid && new_gid == kv.gid {
 				//get data from all the servers of this group
 				for _, server := range kv.config.Groups[old_gid] {
-					
+
 					args := &GetShardDataArgs{
-						Shard : shard,
-						Index : kv.config.Num,
+						Shard: shard,
+						Index: kv.config.Num,
 					}
-					
+
 					reply := &GetShardDataReply{}
-					
+
 					ok := call(server, "ShardKV.GetShardData", args, reply)
 					if ok && reply.Err == OK {
 						for k, v := range reply.Datastore {
-							u_datastore[k] = v							
+							u_datastore[k] = v
 						}
 					}
-				}	
+				}
 			}
 		}
-		
+
 		timestamp := strconv.FormatInt(time.Now().UnixNano(), 10)
-		req := Op {
-			Op	: Reconfigure,
-			Ts  : timestamp,
-			
-			Index: i,
-			Config : currentConfig,
-			Datastore : u_datastore,
+		req := Op{
+			Op: Reconfigure,
+			Ts: timestamp,
+
+			Index:     i,
+			Config:    currentConfig,
+			Datastore: u_datastore,
 		}
 		kv.RequestDatastore(req)
-	}//outer for
+	} //outer for
 }
 
 // tell the server to shut itself down.
