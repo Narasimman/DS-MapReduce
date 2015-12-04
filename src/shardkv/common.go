@@ -13,7 +13,7 @@ const (
 	OK            = "OK"
 	ErrNoKey      = "ErrNoKey"
 	ErrWrongGroup = "ErrWrongGroup"
-	ErrIndex = "ErrIndex"
+	ErrIndex      = "ErrIndex"
 )
 
 type Err string

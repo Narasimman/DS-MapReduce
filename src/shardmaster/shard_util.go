@@ -93,12 +93,12 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 	for {
 		group := findGroupToBalance(config, operation)
 		if operation == LeaveOp {
-			//if leaving get shard from that group and 
+			//if leaving get shard from that group and
 			// distribute it to the light group
 			shard := getShard(gid, config)
 
 			if shard == -1 {
-				//this means we are done with redistributing all shards in the 
+				//this means we are done with redistributing all shards in the
 				//group that is leaving
 				DPrintf("Shards redistributed in leave group")
 				break
@@ -185,7 +185,7 @@ func (sm *ShardMaster) RequestOp(op Op) Config {
 		}
 
 		config := sm.CallHandler(res)
-		sm.processed++		
+		sm.processed++
 		sm.px.Done(sm.processed)
 
 		if res.UUID == op.UUID {
