@@ -13,7 +13,6 @@ const (
 	OK            = "OK"
 	ErrNoKey      = "ErrNoKey"
 	ErrWrongGroup = "ErrWrongGroup"
-
 	ErrIndex = "ErrIndex"
 )
 

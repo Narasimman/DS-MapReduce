@@ -42,7 +42,6 @@ func (kv *ShardKV) RequestPaxosToUpdateDB(op Op) {
 				DPrintf("paxos group:  ", "wrong group")
 				return
 			}
-
 		}
 
 		res := kv.WaitForAgreement(op)

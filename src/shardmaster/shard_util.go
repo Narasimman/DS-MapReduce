@@ -98,7 +98,9 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 			shard := getShard(gid, config)
 
 			if shard == -1 {
-				DPrintf("Shards redistributed")
+				//this means we are done with redistributing all shards in the 
+				//group that is leaving
+				DPrintf("Shards redistributed in leave group")
 				break
 			}
 
@@ -149,17 +151,16 @@ func (sm *ShardMaster) GetNextConfig() *Config {
 /*
 Calls the corresponding handler based on op arguments.
 */
-func (sm *ShardMaster) CallOp(op Op, seq int) Config {
-	gid, servers, shard, num := op.GroupId, op.Servers, op.Shard, op.Num
+func (sm *ShardMaster) CallHandler(op Op) Config {
 	switch op.Type {
 	case JoinOp:
-		sm.JoinHandler(gid, servers)
+		sm.JoinHandler(op.GroupId, op.Servers)
 	case MoveOp:
-		sm.MoveHandler(shard, gid)
+		sm.MoveHandler(op.Shard, op.GroupId)
 	case QueryOp:
-		return sm.QueryHandler(num)
+		return sm.QueryHandler(op.Num)
 	case LeaveOp:
-		sm.LeaveHandler(gid)
+		sm.LeaveHandler(op.GroupId)
 	default:
 		fmt.Println("Invalid Operation")
 	}
@@ -172,8 +173,7 @@ func (sm *ShardMaster) RequestOp(op Op) Config {
 	// Loop until paxos gives a decision
 	for {
 		//DPrintf("Looping until paxos gives a decision")
-		sm.processed++
-		seq := sm.processed
+		seq := sm.processed + 1
 		decided, val := sm.px.Status(seq)
 		var res Op
 
@@ -184,7 +184,8 @@ func (sm *ShardMaster) RequestOp(op Op) Config {
 			res = sm.WaitOnAgreement(seq)
 		}
 
-		config := sm.CallOp(res, seq)
+		config := sm.CallHandler(res)
+		sm.processed++		
 		sm.px.Done(sm.processed)
 
 		if res.UUID == op.UUID {
