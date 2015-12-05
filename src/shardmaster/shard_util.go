@@ -58,12 +58,12 @@ func getShard(gid int64, config *Config) int {
 
 func getGroupForLeave(config *Config, countMap map[int64]int) int64 {
 	group := int64(0)
-	min := int(^uint(0) >> 1)
+	count := int(^uint(0) >> 1)
 	for gid := range countMap {
 		_, exists := config.Groups[gid]
 		if exists {
-			if min > countMap[gid] {
-				min = countMap[gid]
+			if count > countMap[gid] {
+				count = countMap[gid]
 				group = gid
 			}
 		}
@@ -73,13 +73,13 @@ func getGroupForLeave(config *Config, countMap map[int64]int) int64 {
 
 func getGroupforJoin(config *Config, countMap map[int64]int) (int64, int) {
 	group := int64(0)
-	max := -1
+	count := -1
 
 	for gid := range countMap {
 		_, exists := config.Groups[gid]
 		if exists {
-			if max < countMap[gid] {
-				max = countMap[gid]
+			if count < countMap[gid] {
+				count = countMap[gid]
 				group = gid
 			}
 		}

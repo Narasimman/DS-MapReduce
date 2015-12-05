@@ -28,10 +28,6 @@ func (sm *ShardMaster) MoveHandler(shard int, gid int64) {
 	sm.RequestPaxosOnOp(op)
 }
 
-/*
-Return the highest known configuration if num is negative
-return num config otherwise
-*/
 func (sm *ShardMaster) QueryHandler(num int) Config {
 	op := Op{
 		Type: QueryOp,
