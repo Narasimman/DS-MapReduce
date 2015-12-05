@@ -3,6 +3,7 @@ package shardmaster
 import (
 	"fmt"
 	"paxos"
+	"time"
 )
 
 import "crypto/rand"
@@ -23,6 +24,26 @@ func nrand() int64 {
 }
 
 /*
+The usual wait agreement for the paxos protocol
+*/
+func (sm *ShardMaster) WaitOnAgreement(seq int) Op {
+	to := 10 * time.Millisecond
+	var res Op
+	for {
+		decided, val := sm.px.Status(seq)
+		if decided == paxos.Decided {
+			res = val.(Op)
+			return res
+		}
+
+		time.Sleep(to)
+		if to < 10*time.Second {
+			to *= 2
+		}
+	}
+}
+
+/*
 Returns the shard for a given group id and config.
 */
 func getShard(gid int64, config *Config) int {
@@ -34,86 +55,116 @@ func getShard(gid int64, config *Config) int {
 	return -1
 }
 
-/*
-This function finds the group that has less and more number of shards
-The group that has less number of shares than typical will be used for leave operation
-and shards will be added to the light group
-The group that has more number of shards will be used during join operation
-and those shards will be added to the new group
-*/
-func findGroupToBalance(config *Config, operation string) int64 {
-	group, l_count, j_count := int64(0), int(^uint(0)>>1), -1
-	counts := make(map[int64]int)
-
-	for gid := range config.Groups {
-		counts[gid] = 0
-	}
-
-	for _, gid := range config.Shards {
-		counts[gid] = counts[gid] + 1
-	}
-
-	for gid := range counts {
+func getMinGroup(config *Config, countMap map[int64]int) int64 {
+	group := int64(0)
+	count := int(^uint(0) >> 1)
+	for gid := range countMap {
 		_, exists := config.Groups[gid]
-
 		if exists {
-			if operation == LeaveOp {
-				if l_count > counts[gid] {
-					l_count = counts[gid]
-					group = gid
-				}
-			} else if operation == JoinOp {
-				if j_count < counts[gid] {
-					j_count = counts[gid]
-					group = gid
-				}
+			if count > countMap[gid] {
+				count = countMap[gid]
+				group = gid
 			}
 		}
 	}
+	return group
+}
 
-	// if the group id is 0 then return 0 and not the max/min
+func getMaxGroup(config *Config, countMap map[int64]int) int64 {
+	group := int64(0)
+	count := -1
+
+	for gid := range countMap {
+		_, exists := config.Groups[gid]
+		if exists {
+			if count < countMap[gid] {
+				count = countMap[gid]
+				group = gid
+			}
+		}
+	}
+	return group
+}
+
+func isEmptyGroup(gid int64, config *Config) bool {
+	for _, g := range config.Shards {
+		if gid == g {
+			return false
+		}
+	}
+	return true
+}
+
+func getShardCountPerGroup(config *Config) map[int64]int {
+	shardsCount := make(map[int64]int)
+
+	for gid := range config.Groups {
+		shardsCount[gid] = 0
+	}
+
 	for _, gid := range config.Shards {
 		if gid == 0 {
-			group = 0
+			return map[int64]int{}
+		}
+
+		_, exists := shardsCount[gid]
+
+		if !exists {
+			shardsCount[gid] = 0
+		} else {
+			shardsCount[gid]++
 		}
 	}
 
-	return group
+	return shardsCount
 }
 
 /*
 Rebalances the shards
 */
-func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
+func (sm *ShardMaster) RedistributeShards(gid int64, operation string) {
 	config := &sm.configs[sm.configNum]
 	shardsPerGroup := NShards / len(config.Groups)
+	shardsCountMap := getShardCountPerGroup(config)
+	processed := false
 
-	for i:=0;;i++ {
-		group := findGroupToBalance(config, operation)
+	if len(shardsCountMap) < 1 {
+		processed = true
+
+	}
+
+	group := int64(0)
+
+	for i := 0; ; i++ {
 		if operation == LeaveOp {
-			//if leaving get shard from that group and
-			// distribute it to the light group
-			shard := getShard(gid, config)
-
-			if shard == -1 {
+			if isEmptyGroup(gid, config) {
 				//this means we are done with redistributing all shards in the
 				//group that is leaving
 				DPrintf("Shards redistributed in leave group")
-				break
+				return
 			}
 
+			if !processed {
+				group = getMinGroup(config, shardsCountMap)
+			}
+
+			shard := getShard(gid, config)
 			config.Shards[shard] = group
 
 		} else if operation == JoinOp {
 			if i < shardsPerGroup {
-				shard := getShard(group, config)
 
-				if shard != -1 {
+				if !processed {
+					group = getMaxGroup(config, shardsCountMap)
+				}
+
+				if !isEmptyGroup(group, config) {
+					shard := getShard(group, config)
 					config.Shards[shard] = gid
 				}
 			} else {
 				// we are done redistributing
-				break
+				return
 			}
 		} else {
 			DPrintf("Calling rebalancing for invalid operation")
@@ -122,20 +173,20 @@ func (sm *ShardMaster) RebalanceShards(gid int64, operation string) {
 }
 
 func (sm *ShardMaster) GetNextConfig() *Config {
-	oldConfig := &sm.configs[sm.configNum]
+	config := &sm.configs[sm.configNum]
 
 	var newConfig Config
-	newConfig.Num = oldConfig.Num + 1
+	newConfig.Num = config.Num + 1
 	newConfig.Groups = make(map[int64][]string)
 	newConfig.Shards = [NShards]int64{}
 
 	//Copy all groups data because assigning just gets the reference
-	for gid, servers := range oldConfig.Groups {
+	for gid, servers := range config.Groups {
 		newConfig.Groups[gid] = servers
 	}
 
 	//copy all shards data
-	for shard, gid := range oldConfig.Shards {
+	for shard, gid := range config.Shards {
 		newConfig.Shards[shard] = gid
 	}
 
@@ -164,7 +215,7 @@ func (sm *ShardMaster) CallHandler(op Op) Config {
 	return Config{}
 }
 
-func (sm *ShardMaster) RequestOp(op Op) Config {
+func (sm *ShardMaster) RequestPaxosOnOp(op Op) Config {
 	op.UUID = nrand()
 
 	// Loop until paxos gives a decision

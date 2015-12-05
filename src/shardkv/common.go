@@ -27,7 +27,7 @@ type PutAppendArgs struct {
 	// otherwise RPC will break.
 
 	Me    string // client
-	Ts    string // timestamp of the operation
+	UUID  int64  // uid of the operation
 	Index int    // Config number
 
 }
@@ -42,7 +42,7 @@ type GetArgs struct {
 	// You'll have to add definitions here.
 
 	Me    string
-	Ts    string
+	UUID  int64
 	Index int
 }
 

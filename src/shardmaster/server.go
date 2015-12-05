@@ -4,7 +4,6 @@ import "net"
 import "fmt"
 import "net/rpc"
 import "log"
-import "time"
 
 import "paxos"
 import "sync"
@@ -46,23 +45,6 @@ func DPrintf(a ...interface{}) (n int, err error) {
 	return
 }
 
-func (sm *ShardMaster) WaitOnAgreement(seq int) Op {
-	to := 10 * time.Millisecond
-	var res Op
-	for {
-		decided, val := sm.px.Status(seq)
-		if decided == paxos.Decided {
-			res = val.(Op)
-			return res
-		}
-
-		time.Sleep(to)
-		if to < 10*time.Second {
-			to *= 2
-		}
-	}
-}
-
 func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -75,7 +57,7 @@ func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
 		Servers: args.Servers,
 	}
 
-	sm.RequestOp(op)
+	sm.RequestPaxosOnOp(op)
 	return nil
 }
 
@@ -90,7 +72,7 @@ func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) error {
 		GroupId: args.GID,
 	}
 
-	sm.RequestOp(op)
+	sm.RequestPaxosOnOp(op)
 
 	return nil
 }
@@ -106,7 +88,7 @@ func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) error {
 		GroupId: args.GID,
 	}
 
-	sm.RequestOp(op)
+	sm.RequestPaxosOnOp(op)
 	return nil
 }
 
@@ -121,7 +103,7 @@ func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) error {
 		Num:  args.Num,
 	}
 
-	reply.Config = sm.RequestOp(op)
+	reply.Config = sm.RequestPaxosOnOp(op)
 	return nil
 }
 

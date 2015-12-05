@@ -8,7 +8,7 @@ func (sm *ShardMaster) JoinHandler(gid int64, servers []string) {
 	if !exists {
 		//DPrintf("Join a new group")
 		config.Groups[gid] = servers
-		sm.RebalanceShards(gid, JoinOp)
+		sm.RedistributeShards(gid, JoinOp)
 	}
 }
 
@@ -20,7 +20,7 @@ func (sm *ShardMaster) LeaveHandler(gid int64) {
 	if exists {
 		DPrintf("Leaving bye bye")
 		delete(config.Groups, gid)
-		sm.RebalanceShards(gid, LeaveOp)
+		sm.RedistributeShards(gid, LeaveOp)
 	}
 }
 
@@ -35,7 +35,7 @@ return num config otherwise
 */
 func (sm *ShardMaster) QueryHandler(num int) Config {
 	config := Config{}
-	if num >=  0 {
+	if num >= 0 {
 		config = sm.configs[num]
 	} else {
 		//Return the latest configuration

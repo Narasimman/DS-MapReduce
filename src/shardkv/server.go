@@ -2,7 +2,6 @@ package shardkv
 
 import (
 	"net"
-	"strconv"
 )
 import "fmt"
 import "net/rpc"
@@ -38,8 +37,8 @@ type Op struct {
 	Key   string
 	Value string
 	Op    string
-	Ts    string //time stamp of the operation
-	Index int    //the index of the config
+	UUID  int64 //unique of the operation
+	Index int   //the index of the config
 
 	Config    shardmaster.Config
 	Datastore map[string]string
@@ -58,7 +57,6 @@ type ShardKV struct {
 
 	// Your definitions here.
 	config    shardmaster.Config
-	index     int
 	seq       int
 	datastore map[string]string
 }
@@ -85,7 +83,7 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 		Index: args.Index,
 		Key:   args.Key,
 		Op:    args.Op,
-		Ts:    args.Ts,
+		UUID:  args.UUID,
 	}
 
 	kv.RequestPaxosToUpdateDB(op)
@@ -124,7 +122,7 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 		Key:   args.Key,
 		Value: args.Value,
 		Op:    args.Op,
-		Ts:    args.Ts,
+		UUID:  args.UUID,
 	}
 
 	kv.RequestPaxosToUpdateDB(op)
@@ -181,8 +179,8 @@ func (kv *ShardKV) tick() {
 		} //for each shard
 
 		req := Op{
-			Op: Reconfigure,
-			Ts: strconv.FormatInt(time.Now().UnixNano(), 10),
+			Op:   Reconfigure,
+			UUID: nrand(),
 
 			Index:     i,
 			Config:    currentConfig,
@@ -240,7 +238,6 @@ func StartServer(gid int64, shardmasters []string,
 	kv.config = shardmaster.Config{Num: -1}
 	kv.datastore = make(map[string]string)
 	kv.seq = 0
-	kv.index = -1
 
 	rpcs := rpc.NewServer()
 	rpcs.Register(kv)

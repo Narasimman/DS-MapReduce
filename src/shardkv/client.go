@@ -93,7 +93,6 @@ func (ck *Clerk) Get(key string) string {
 	defer ck.mu.Unlock()
 
 	// You'll have to modify Get().
-	timestamp := strconv.FormatInt(time.Now().UnixNano(), 10)
 	DPrintf("", "Client: Get operation")
 
 	for {
@@ -110,7 +109,7 @@ func (ck *Clerk) Get(key string) string {
 					Key:   key,
 					Op:    "Get",
 					Me:    ck.Me,
-					Ts:    timestamp,
+					UUID:  nrand(),
 					Index: ck.config.Num,
 				}
 
@@ -139,9 +138,6 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 	ck.mu.Lock()
 	defer ck.mu.Unlock()
 
-	// You'll have to modify PutAppend().
-	timestamp := strconv.FormatInt(time.Now().UnixNano(), 10)
-
 	for {
 		shard := key2shard(key)
 
@@ -157,7 +153,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 					Value: value,
 					Op:    op,
 					Me:    ck.Me,
-					Ts:    timestamp,
+					UUID:  nrand(),
 					Index: ck.config.Num,
 				}
 
