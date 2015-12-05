@@ -1,11 +1,11 @@
 package shardmaster
 
-func (sm *ShardMaster) JoinHandler(gid int64, servers []string) {
-	config := sm.GetNextConfig()
-
-	_, exists := config.Groups[gid]
+func (sm *ShardMaster) JoinHandler(gid int64, servers []string) {	
+	currentconfig := sm.configs[sm.configNum]
+	_, exists := currentconfig.Groups[gid]
 
 	if !exists {
+		config := sm.GetNextConfig()
 		//DPrintf("Join a new group")
 		config.Groups[gid] = servers
 		sm.RedistributeShards(gid, JoinOp)
@@ -13,11 +13,11 @@ func (sm *ShardMaster) JoinHandler(gid int64, servers []string) {
 }
 
 func (sm *ShardMaster) LeaveHandler(gid int64) {
-	config := sm.GetNextConfig()
-
-	_, exists := config.Groups[gid]
+	currentconfig := sm.configs[sm.configNum]
+	_, exists := currentconfig.Groups[gid]
 
 	if exists {
+		config := sm.GetNextConfig()
 		DPrintf("Leaving bye bye")
 		delete(config.Groups, gid)
 		sm.RedistributeShards(gid, LeaveOp)
@@ -25,8 +25,13 @@ func (sm *ShardMaster) LeaveHandler(gid int64) {
 }
 
 func (sm *ShardMaster) MoveHandler(shard int, gid int64) {
-	config := sm.GetNextConfig()
-	config.Shards[shard] = gid
+	config := sm.configs[sm.configNum]	
+	current_group := config.Shards[shard]
+	
+	if current_group >= 0 {
+		newconfig := sm.GetNextConfig()
+		newconfig.Shards[shard] = gid
+	}
 }
 
 /*

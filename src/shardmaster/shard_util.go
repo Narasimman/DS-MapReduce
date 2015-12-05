@@ -37,7 +37,7 @@ func (sm *ShardMaster) WaitOnAgreement(seq int) Op {
 		}
 
 		time.Sleep(to)
-		if to < 10*time.Second {
+		if to < 20*time.Second {
 			to *= 2
 		}
 	}
@@ -153,7 +153,6 @@ func (sm *ShardMaster) RedistributeShards(gid int64, operation string) {
 
 		} else if operation == JoinOp {
 			if i < shardsPerGroup {
-
 				if !processed {
 					group = getMaxGroup(config, shardsCountMap)
 				}
@@ -168,6 +167,7 @@ func (sm *ShardMaster) RedistributeShards(gid int64, operation string) {
 			}
 		} else {
 			DPrintf("Calling rebalancing for invalid operation")
+			return
 		}
 	}
 }
@@ -189,10 +189,9 @@ func (sm *ShardMaster) GetNextConfig() *Config {
 	for shard, gid := range config.Shards {
 		newConfig.Shards[shard] = gid
 	}
-
-	sm.configNum++
-	//append the new config
+	
 	sm.configs = append(sm.configs, newConfig)
+	sm.configNum++
 	return &sm.configs[sm.configNum]
 }
 
