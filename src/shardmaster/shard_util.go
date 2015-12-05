@@ -72,7 +72,7 @@ func getMinGroup(config *Config, countMap map[int64]int) int64 {
 	return group
 }
 
-func getMaxGroup(config *Config, countMap map[int64]int) (int64,int){
+func getMaxGroup(config *Config, countMap map[int64]int) (int64, int) {
 	group := int64(0)
 	max := -1
 
@@ -161,7 +161,7 @@ func (sm *ShardMaster) RedistributeShards(gid int64, operation string) {
 					group, shard = int64(0), getShard(group, config)
 				}
 
-				if !isEmptyGroup(group, config) {					
+				if !isEmptyGroup(group, config) {
 					config.Shards[shard] = gid
 				}
 			} else {
@@ -192,7 +192,7 @@ func (sm *ShardMaster) GetNextConfig() *Config {
 	for shard, gid := range config.Shards {
 		newConfig.Shards[shard] = gid
 	}
-	
+
 	sm.configs = append(sm.configs, newConfig)
 	sm.configNum++
 	return &sm.configs[sm.configNum]
@@ -204,13 +204,13 @@ Calls the corresponding handler based on op arguments.
 func (sm *ShardMaster) CallHandler(op Op) Config {
 	switch op.Type {
 	case JoinOp:
-		sm.JoinHandler(op.GroupId, op.Servers)
+		sm.PerformJoin(op)
 	case MoveOp:
-		sm.MoveHandler(op.Shard, op.GroupId)
+		sm.PerformMove(op)
 	case QueryOp:
-		return sm.QueryHandler(op.Num)
+		return sm.PerformQuery(op)
 	case LeaveOp:
-		sm.LeaveHandler(op.GroupId)
+		sm.PerformLeave(op)
 	default:
 		fmt.Println("Invalid Operation")
 	}

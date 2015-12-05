@@ -51,13 +51,7 @@ func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) error {
 
 	DPrintf("Join Operation:")
 
-	op := Op{
-		Type:    JoinOp,
-		GroupId: args.GID,
-		Servers: args.Servers,
-	}
-
-	sm.RequestPaxosOnOp(op)
+	sm.JoinHandler(args.GID, args.Servers)
 	return nil
 }
 
@@ -66,13 +60,7 @@ func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) error {
 	defer sm.mu.Unlock()
 
 	DPrintf("Leave Operation:")
-
-	op := Op{
-		Type:    LeaveOp,
-		GroupId: args.GID,
-	}
-
-	sm.RequestPaxosOnOp(op)
+	sm.LeaveHandler(args.GID)
 
 	return nil
 }
@@ -82,13 +70,7 @@ func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) error {
 	defer sm.mu.Unlock()
 
 	DPrintf("Move Operation:")
-	op := Op{
-		Type:    MoveOp,
-		Shard:   args.Shard,
-		GroupId: args.GID,
-	}
-
-	sm.RequestPaxosOnOp(op)
+	sm.MoveHandler(args.Shard, args.GID)
 	return nil
 }
 
@@ -97,13 +79,7 @@ func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) error {
 	defer sm.mu.Unlock()
 
 	DPrintf("Query Operation:")
-
-	op := Op{
-		Type: QueryOp,
-		Num:  args.Num,
-	}
-
-	reply.Config = sm.RequestPaxosOnOp(op)
+	reply.Config = sm.QueryHandler(args.Num)
 	return nil
 }
 
