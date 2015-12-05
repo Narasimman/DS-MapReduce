@@ -47,22 +47,24 @@ func (sm *ShardMaster) WaitOnAgreement(seq int) Op {
 Returns the shard for a given group id and config.
 */
 func getShard(gid int64, config *Config) int {
-	for shard, g := range config.Shards {
+	shard := -1
+	for s, g := range config.Shards {
 		if gid == g {
-			return shard
+			shard = s
+			break
 		}
 	}
-	return -1
+	return shard
 }
 
 func getMinGroup(config *Config, countMap map[int64]int) int64 {
 	group := int64(0)
-	count := int(^uint(0) >> 1)
+	min := int(^uint(0) >> 1)
 	for gid := range countMap {
 		_, exists := config.Groups[gid]
 		if exists {
-			if count > countMap[gid] {
-				count = countMap[gid]
+			if min > countMap[gid] {
+				min = countMap[gid]
 				group = gid
 			}
 		}
@@ -70,20 +72,20 @@ func getMinGroup(config *Config, countMap map[int64]int) int64 {
 	return group
 }
 
-func getMaxGroup(config *Config, countMap map[int64]int) int64 {
+func getMaxGroup(config *Config, countMap map[int64]int) (int64,int){
 	group := int64(0)
-	count := -1
+	max := -1
 
 	for gid := range countMap {
 		_, exists := config.Groups[gid]
 		if exists {
-			if count < countMap[gid] {
-				count = countMap[gid]
+			if max < countMap[gid] {
+				max = countMap[gid]
 				group = gid
 			}
 		}
 	}
-	return group
+	return group, getShard(group, config)
 }
 
 func isEmptyGroup(gid int64, config *Config) bool {
@@ -115,7 +117,6 @@ func getShardCountPerGroup(config *Config) map[int64]int {
 			shardsCount[gid]++
 		}
 	}
-
 	return shardsCount
 }
 
@@ -134,6 +135,7 @@ func (sm *ShardMaster) RedistributeShards(gid int64, operation string) {
 	}
 
 	group := int64(0)
+	shard := -1
 
 	for i := 0; ; i++ {
 		if operation == LeaveOp {
@@ -154,11 +156,12 @@ func (sm *ShardMaster) RedistributeShards(gid int64, operation string) {
 		} else if operation == JoinOp {
 			if i < shardsPerGroup {
 				if !processed {
-					group = getMaxGroup(config, shardsCountMap)
+					group, shard = getMaxGroup(config, shardsCountMap)
+				} else {
+					group, shard = int64(0), getShard(group, config)
 				}
 
-				if !isEmptyGroup(group, config) {
-					shard := getShard(group, config)
+				if !isEmptyGroup(group, config) {					
 					config.Shards[shard] = gid
 				}
 			} else {
