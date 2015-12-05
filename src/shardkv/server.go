@@ -20,7 +20,6 @@ const (
 	Get         = "Get"
 	Put         = "Put"
 	Append      = "Append"
-	GetData     = "GetData"
 	Reconfigure = "Reconfigure"
 )
 

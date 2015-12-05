@@ -35,7 +35,7 @@ func (kv *ShardKV) RequestPaxosToUpdateDB(op Op) {
 				DPrintf("wrong: ", "current operation config is less than highest seen")
 				return
 			}
-		} else if op.Op != GetData {
+		} else if op.Op == Put || op.Op == Get || op.Op == Append {
 			shard := key2shard(op.Key)
 
 			if kv.config.Shards[shard] != kv.gid {
@@ -90,7 +90,7 @@ func (kv *ShardKV) GetShardData(args *GetDataArgs, reply *GetDataReply) error {
 	}
 
 	req := Op{
-		Op:   GetData,
+		Op:   "GetData",
 		UUID: nrand(),
 	}
 
