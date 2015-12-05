@@ -1,7 +1,6 @@
 package shardmaster
 
 import (
-	"fmt"
 	"paxos"
 	"time"
 )
@@ -57,7 +56,7 @@ func getShard(gid int64, config *Config) int {
 	return shard
 }
 
-func getMinGroup(config *Config, countMap map[int64]int) int64 {
+func getGroupForLeave(config *Config, countMap map[int64]int) int64 {
 	group := int64(0)
 	min := int(^uint(0) >> 1)
 	for gid := range countMap {
@@ -72,7 +71,7 @@ func getMinGroup(config *Config, countMap map[int64]int) int64 {
 	return group
 }
 
-func getMaxGroup(config *Config, countMap map[int64]int) (int64, int) {
+func getGroupforJoin(config *Config, countMap map[int64]int) (int64, int) {
 	group := int64(0)
 	max := -1
 
@@ -147,7 +146,7 @@ func (sm *ShardMaster) RedistributeShards(gid int64, operation string) {
 			}
 
 			if !processed {
-				group = getMinGroup(config, shardsCountMap)
+				group = getGroupForLeave(config, shardsCountMap)
 			}
 
 			shard := getShard(gid, config)
@@ -156,7 +155,7 @@ func (sm *ShardMaster) RedistributeShards(gid int64, operation string) {
 		} else if operation == JoinOp {
 			if i < shardsPerGroup {
 				if !processed {
-					group, shard = getMaxGroup(config, shardsCountMap)
+					group, shard = getGroupforJoin(config, shardsCountMap)
 				} else {
 					group, shard = int64(0), getShard(group, config)
 				}
@@ -198,25 +197,6 @@ func (sm *ShardMaster) GetNextConfig() *Config {
 	return &sm.configs[sm.configNum]
 }
 
-/*
-Calls the corresponding handler based on op arguments.
-*/
-func (sm *ShardMaster) CallHandler(op Op) Config {
-	switch op.Type {
-	case JoinOp:
-		sm.PerformJoin(op)
-	case MoveOp:
-		sm.PerformMove(op)
-	case QueryOp:
-		return sm.PerformQuery(op)
-	case LeaveOp:
-		sm.PerformLeave(op)
-	default:
-		fmt.Println("Invalid Operation")
-	}
-	return Config{}
-}
-
 func (sm *ShardMaster) RequestPaxosOnOp(op Op) Config {
 	op.UUID = nrand()
 
@@ -234,7 +214,7 @@ func (sm *ShardMaster) RequestPaxosOnOp(op Op) Config {
 			res = sm.WaitOnAgreement(seq)
 		}
 
-		config := sm.CallHandler(res)
+		config := sm.PerformOperation(res)
 		sm.processed++
 		sm.px.Done(sm.processed)
 
