@@ -73,7 +73,7 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 
 	shard := key2shard(args.Key)
 
-	if kv.config.Shards[shard] != kv.gid {
+	if !kv.isValidGroup(shard) {
 		reply.Err = ErrWrongGroup
 		return nil
 	}
@@ -111,7 +111,7 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 
 	shard := key2shard(args.Key)
 
-	if kv.config.Shards[shard] != kv.gid {
+	if !kv.isValidGroup(shard) {
 		reply.Err = ErrWrongGroup
 		return nil
 	}

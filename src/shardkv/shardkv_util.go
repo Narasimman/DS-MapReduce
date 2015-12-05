@@ -26,6 +26,10 @@ func (kv *ShardKV) WaitForAgreement(op Op) Op {
 	return res
 }
 
+func (kv *ShardKV) isValidGroup(shard int) bool {
+	return kv.config.Shards[shard] == kv.gid	
+}
+
 func (kv *ShardKV) RequestPaxosToUpdateDB(op Op) {
 
 	for { // loop until paxos succeed
@@ -38,7 +42,7 @@ func (kv *ShardKV) RequestPaxosToUpdateDB(op Op) {
 		} else if op.Op == Put || op.Op == Get || op.Op == Append {
 			shard := key2shard(op.Key)
 
-			if kv.config.Shards[shard] != kv.gid {
+			if !kv.isValidGroup(shard) {
 				DPrintf("paxos group:  ", "wrong group")
 				return
 			}
