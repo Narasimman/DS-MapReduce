@@ -77,7 +77,7 @@ func isEmptyGroup(gid int64, config *Config) bool {
 }
 
 func getShardCountPerGroup(config *Config) map[int64]int {
-	shardsCount := make(map[int64]int)
+	shardsCount := map[int64]int{}
 
 	for gid := range config.Groups {
 		shardsCount[gid] = 0

@@ -49,22 +49,41 @@ func (sm *ShardMaster) PerformOperation(op Op) Config {
 		currentconfig := sm.configs[sm.configNum]
 		_, exists := currentconfig.Groups[gid]
 
-		if !exists {
+		if exists {
+			return Config{} 
+		} else {
 			config := sm.GetNextConfig()
 			//DPrintf("Join a new group")
 			config.Groups[gid] = servers
-			sm.RedistributeShards(gid, JoinOp)
+			if len(config.Groups) == 1 {
+				//first group
+				for i:=0;i < NShards; i++ {
+					config.Shards[i] = gid
+				}
+			} else if len(config.Groups) > 1 {				
+				sm.RedistributeShards(gid, JoinOp)
+			}
 		}
 	} else if operation == LeaveOp {
 		gid := op.GroupId
 		currentconfig := sm.configs[sm.configNum]
 		_, exists := currentconfig.Groups[gid]
 
-		if exists {
+		if !exists {
+			return Config{}
+		} else {
 			config := sm.GetNextConfig()
 			DPrintf("Leaving bye bye")
 			delete(config.Groups, gid)
-			sm.RedistributeShards(gid, LeaveOp)
+			
+			if len(config.Groups) == 0 {
+				// groups empty
+				for i:=0;i < NShards; i++ {
+					config.Shards[i] = 0
+				}
+			} else {			
+				sm.RedistributeShards(gid, LeaveOp)
+			}
 		}
 
 	} else if operation == MoveOp {
