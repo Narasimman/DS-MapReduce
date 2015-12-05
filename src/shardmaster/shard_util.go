@@ -23,26 +23,6 @@ func nrand() int64 {
 }
 
 /*
-The usual wait agreement for the paxos protocol
-*/
-func (sm *ShardMaster) WaitOnAgreement(seq int) Op {
-	to := 10 * time.Millisecond
-	var res Op
-	for {
-		decided, val := sm.px.Status(seq)
-		if decided == paxos.Decided {
-			res = val.(Op)
-			return res
-		}
-
-		time.Sleep(to)
-		if to < 20*time.Second {
-			to *= 2
-		}
-	}
-}
-
-/*
 Returns the shard for a given group id and config.
 */
 func getShard(gid int64, config *Config) int {
@@ -147,6 +127,8 @@ func (sm *ShardMaster) RedistributeShards(gid int64, operation string) {
 
 			if !processed {
 				group = getGroupForLeave(config, shardsCountMap)
+			} else {
+				group = int64(0)
 			}
 
 			shard := getShard(gid, config)
@@ -195,6 +177,26 @@ func (sm *ShardMaster) GetNextConfig() *Config {
 	sm.configs = append(sm.configs, newConfig)
 	sm.configNum++
 	return &sm.configs[sm.configNum]
+}
+
+/*
+The usual wait agreement for the paxos protocol
+*/
+func (sm *ShardMaster) WaitOnAgreement(seq int) Op {
+	to := 10 * time.Millisecond
+	var res Op
+	for {
+		decided, val := sm.px.Status(seq)
+		if decided == paxos.Decided {
+			res = val.(Op)
+			return res
+		}
+
+		time.Sleep(to)
+		if to < 20*time.Second {
+			to *= 2
+		}
+	}
 }
 
 func (sm *ShardMaster) RequestPaxosOnOp(op Op) Config {

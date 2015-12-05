@@ -36,6 +36,10 @@ func (sm *ShardMaster) QueryHandler(num int) Config {
 	return sm.RequestPaxosOnOp(op)
 }
 
+
+/*
+This is the core function called by the Paxos protocol agreement
+*/
 func (sm *ShardMaster) PerformOperation(op Op) Config {
 	operation := op.Type
 
