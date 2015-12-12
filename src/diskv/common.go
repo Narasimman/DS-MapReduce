@@ -10,9 +10,18 @@ package diskv
 //
 
 const (
+	Get         = "Get"
+	Put         = "Put"
+	Append      = "Append"
+	Reconfigure = "Reconfigure"
+)
+
+
+const (
 	OK            = "OK"
 	ErrNoKey      = "ErrNoKey"
 	ErrWrongGroup = "ErrWrongGroup"
+	ErrIndex      = "ErrIndex"
 )
 
 type Err string
@@ -25,6 +34,9 @@ type PutAppendArgs struct {
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
 
+	Me    string // client
+	UUID  int64  // uid of the operation
+	Index int    // Config number
 }
 
 type PutAppendReply struct {
@@ -33,11 +45,29 @@ type PutAppendReply struct {
 
 type GetArgs struct {
 	Key string
+	Op  string
 	// You'll have to add definitions here.
+
+	Me    string
+	UUID  int64
+	Index int
 }
 
 type GetReply struct {
 	Err   Err
 	Value string
 }
+
+type GetDataArgs struct {
+	Shard int
+	Index int
+	Me    string
+}
+
+type GetDataReply struct {
+	Err       Err
+	Datastore map[string]string
+	Logs      map[string]string
+}
+
 

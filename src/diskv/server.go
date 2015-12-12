@@ -18,6 +18,7 @@ import "io/ioutil"
 import "strconv"
 
 
+
 const Debug = 0
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
@@ -30,6 +31,14 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 
 type Op struct {
 	// Your definitions here.
+	Key   string
+	Value string
+	Op    string
+	UUID  int64 //unique of the operation
+	Index int   //the index of the config
+
+	Config    shardmaster.Config
+	Datastore map[string]string
 }
 
 
@@ -46,6 +55,9 @@ type DisKV struct {
 	gid int64 // my replica group ID
 
 	// Your definitions here.
+	config    shardmaster.Config
+	seq       int
+	datastore map[string]string
 }
 
 //
@@ -140,13 +152,71 @@ func (kv *DisKV) fileReplaceShard(shard int, m map[string]string) {
 
 
 func (kv *DisKV) Get(args *GetArgs, reply *GetReply) error {
-	// Your code here.
+	DPrintf("Server: Get operation")
+
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+
+	if args.Index > kv.config.Num {
+		reply.Err = ErrIndex
+		return nil
+	}
+
+	shard := key2shard(args.Key)
+
+	if !kv.isValidGroup(shard) {
+		reply.Err = ErrWrongGroup
+		return nil
+	}
+
+	op := Op{
+		Index: args.Index,
+		Key:   args.Key,
+		Op:    args.Op,
+		UUID:  args.UUID,
+	}
+
+	kv.RequestPaxosToUpdateDB(op)
+	val, exists := kv.datastore[args.Key]
+
+	if exists == false {
+		reply.Err = ErrNoKey
+	} else {
+		DPrintf("GET: ", "GET SUCCESS")
+		reply.Err = OK
+		reply.Value = val
+	}
 	return nil
 }
 
 // RPC handler for client Put and Append requests
 func (kv *DisKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
-	// Your code here.
+	DPrintf("Server: Put/Append operation")
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+
+	if args.Index > kv.config.Num {
+		reply.Err = ErrIndex
+		return nil
+	}
+
+	shard := key2shard(args.Key)
+
+	if !kv.isValidGroup(shard) {
+		reply.Err = ErrWrongGroup
+		return nil
+	}
+
+	op := Op{
+		Index: args.Index,
+		Key:   args.Key,
+		Value: args.Value,
+		Op:    args.Op,
+		UUID:  args.UUID,
+	}
+
+	kv.RequestPaxosToUpdateDB(op)
+	reply.Err = OK
 	return nil
 }
 
@@ -155,7 +225,58 @@ func (kv *DisKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 // if so, re-configure.
 //
 func (kv *DisKV) tick() {
-	// Your code here.
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+
+	config := kv.sm.Query(-1)
+
+	if kv.config.Num == -1 && config.Num == 1 {
+		DPrintf("Tick:", "Initial reconfiguration")
+		kv.config = config
+		return
+	}
+
+	//else update database until the latest config
+	for i := kv.config.Num + 1; i <= config.Num; i++ {
+
+		currentConfig := kv.sm.Query(i)
+
+		new_datastore := map[string]string{}
+
+		//for each shard in kv
+		for shard, old_gid := range kv.config.Shards {
+			new_gid := currentConfig.Shards[shard]
+			if old_gid != new_gid && new_gid == kv.gid {
+				//get data from all the servers of this group
+				for _, server := range kv.config.Groups[old_gid] {
+
+					args := &GetDataArgs{
+						Shard: shard,
+						Index: kv.config.Num,
+					}
+
+					reply := &GetDataReply{}
+
+					ok := call(server, "DisKV.GetShardData", args, reply)
+					if ok && reply.Err == OK {
+						for k, v := range reply.Datastore {
+							new_datastore[k] = v
+						}
+					}
+				}
+			}
+		} //for each shard
+
+		req := Op{
+			Op:   Reconfigure,
+			UUID: nrand(),
+
+			Index:     i,
+			Config:    currentConfig,
+			Datastore: new_datastore,
+		}
+		kv.RequestPaxosToUpdateDB(req)
+	} //outer for
 }
 
 // tell the server to shut itself down.
@@ -210,6 +331,9 @@ func StartServer(gid int64, shardmasters []string,
 
 	// Your initialization code here.
 	// Don't call Join().
+	kv.config = shardmaster.Config{Num: -1}
+	kv.datastore = make(map[string]string)
+	kv.seq = 0
 
 	// log.SetOutput(ioutil.Discard)
 

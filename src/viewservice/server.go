@@ -23,7 +23,7 @@ type ViewServer struct {
 }
 
 // Debugging
-const Debug = 0
+const Debug = 1
 
 func DPrintf(a ...interface{}) (n int, err error) {
 	if Debug > 0 {
