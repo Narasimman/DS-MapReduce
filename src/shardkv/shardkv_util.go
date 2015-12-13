@@ -2,6 +2,7 @@ package shardkv
 
 import "time"
 import "paxos"
+import "strconv"
 
 func (kv *ShardKV) WaitForAgreement(op Op) Op {
 	kv.seq++
@@ -52,7 +53,7 @@ func (kv *ShardKV) RequestPaxosToUpdateDB(op Op) {
 		kv.UpdateDatastore(res)
 		kv.px.Done(kv.seq)
 
-		if res.UUID == op.UUID {
+		if res.Timestamp == op.Timestamp {
 			return
 		}
 	} // infinite for to loop until paxos decides
@@ -95,7 +96,7 @@ func (kv *ShardKV) GetShardData(args *GetDataArgs, reply *GetDataReply) error {
 
 	req := Op{
 		Op:   "GetData",
-		UUID: nrand(),
+		Timestamp: strconv.FormatInt(time.Now().UnixNano(), 10),
 	}
 
 	kv.RequestPaxosToUpdateDB(req)

@@ -15,6 +15,7 @@ import "syscall"
 import "encoding/gob"
 import "math/rand"
 import "shardmaster"
+import "strconv"
 
 const (
 	Get         = "Get"
@@ -36,11 +37,12 @@ type Op struct {
 	Key   string
 	Value string
 	Op    string
-	UUID  int64 //unique of the operation
+	Timestamp  string //unique of the operation
 	Index int   //the index of the config
 
 	Config    shardmaster.Config
 	Datastore map[string]string
+	logs  	  map[string] string
 }
 
 type ShardKV struct {
@@ -82,7 +84,7 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 		Index: args.Index,
 		Key:   args.Key,
 		Op:    args.Op,
-		UUID:  args.UUID,
+		Timestamp:  args.Timestamp,
 	}
 
 	kv.RequestPaxosToUpdateDB(op)
@@ -121,7 +123,7 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 		Key:   args.Key,
 		Value: args.Value,
 		Op:    args.Op,
-		UUID:  args.UUID,
+		Timestamp:  args.Timestamp,
 	}
 
 	kv.RequestPaxosToUpdateDB(op)
@@ -179,7 +181,7 @@ func (kv *ShardKV) tick() {
 
 		req := Op{
 			Op:   Reconfigure,
-			UUID: nrand(),
+			Timestamp: strconv.FormatInt(time.Now().UnixNano(), 10),
 
 			Index:     i,
 			Config:    currentConfig,

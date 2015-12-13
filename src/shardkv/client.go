@@ -109,7 +109,7 @@ func (ck *Clerk) Get(key string) string {
 					Key:   key,
 					Op:    "Get",
 					Me:    ck.Me,
-					UUID:  nrand(),
+					Timestamp:  strconv.FormatInt(time.Now().UnixNano(), 10),
 					Index: ck.config.Num,
 				}
 
@@ -153,7 +153,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 					Value: value,
 					Op:    op,
 					Me:    ck.Me,
-					UUID:  nrand(),
+					Timestamp:  strconv.FormatInt(time.Now().UnixNano(), 10),
 					Index: ck.config.Num,
 				}
 
