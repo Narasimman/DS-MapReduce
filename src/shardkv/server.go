@@ -39,10 +39,11 @@ type Op struct {
 	Op    string
 	Timestamp  string //unique of the operation
 	Index int   //the index of the config
+	Me    string
 
 	Config    shardmaster.Config
 	Datastore map[string]string
-	logs  	  map[string] string
+	Logs  	  map[string] string
 }
 
 type ShardKV struct {
@@ -60,6 +61,7 @@ type ShardKV struct {
 	config    shardmaster.Config
 	seq       int
 	datastore map[string]string
+	logs 	  map[string] string
 }
 
 func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
@@ -85,6 +87,7 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 		Key:   args.Key,
 		Op:    args.Op,
 		Timestamp:  args.Timestamp,
+		Me     : args.Me,
 	}
 
 	kv.RequestPaxosToUpdateDB(op)
@@ -124,6 +127,7 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 		Value: args.Value,
 		Op:    args.Op,
 		Timestamp:  args.Timestamp,
+		Me     : args.Me,
 	}
 
 	kv.RequestPaxosToUpdateDB(op)
@@ -154,11 +158,13 @@ func (kv *ShardKV) tick() {
 		currentConfig := kv.sm.Query(i)
 
 		new_datastore := map[string]string{}
+		new_logs      := map[string]string{}
 
 		//for each shard in kv
 		for shard, old_gid := range kv.config.Shards {
 			new_gid := currentConfig.Shards[shard]
 			if old_gid != new_gid && new_gid == kv.gid {
+				label := false
 				//get data from all the servers of this group
 				for _, server := range kv.config.Groups[old_gid] {
 
@@ -174,7 +180,18 @@ func (kv *ShardKV) tick() {
 						for k, v := range reply.Datastore {
 							new_datastore[k] = v
 						}
+
+						for k, v := range reply.Logs {
+							val, exists := new_logs[k]
+							if !(exists && val >= v) {
+								new_logs[k] = v
+							}
+						}
+						label = true
 					}
+				}
+				if label == false && old_gid > 0 {
+					return
 				}
 			}
 		} //for each shard
@@ -182,10 +199,11 @@ func (kv *ShardKV) tick() {
 		req := Op{
 			Op:   Reconfigure,
 			Timestamp: strconv.FormatInt(time.Now().UnixNano(), 10),
-
+	
 			Index:     i,
 			Config:    currentConfig,
 			Datastore: new_datastore,
+			Logs     : new_logs,
 		}
 		kv.RequestPaxosToUpdateDB(req)
 	} //outer for
@@ -238,6 +256,7 @@ func StartServer(gid int64, shardmasters []string,
 	// Don't call Join().
 	kv.config = shardmaster.Config{Num: -1}
 	kv.datastore = make(map[string]string)
+	kv.logs      = make(map[string]string)
 	kv.seq = 0
 
 	rpcs := rpc.NewServer()
