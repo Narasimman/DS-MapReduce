@@ -101,6 +101,7 @@ func (ck *Clerk) Get(key string) string {
 		gid := ck.config.Shards[shard]
 
 		servers, ok := ck.config.Groups[gid]
+		timestamp := strconv.FormatInt(time.Now().UnixNano(), 10)
 
 		if ok {
 			// try each server in the shard's replication group.
@@ -109,7 +110,7 @@ func (ck *Clerk) Get(key string) string {
 					Key:   key,
 					Op:    "Get",
 					Me:    ck.Me,
-					UUID:  nrand(),
+					Timestamp:  timestamp,
 					Index: ck.config.Num,
 				}
 				args.Key = key
@@ -144,6 +145,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		gid := ck.config.Shards[shard]
 
 		servers, ok := ck.config.Groups[gid]
+		timestamp := strconv.FormatInt(time.Now().UnixNano(), 10)
 
 		if ok {
 			// try each server in the shard's replication group.
@@ -153,7 +155,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 					Value: value,
 					Op:    op,
 					Me:    ck.Me,
-					UUID:  nrand(),
+					Timestamp: timestamp,
 					Index: ck.config.Num,
 				}
 				var reply PutAppendReply

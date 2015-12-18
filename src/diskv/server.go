@@ -34,11 +34,14 @@ type Op struct {
 	Key   string
 	Value string
 	Op    string
-	UUID  int64 //unique of the operation
+	Timestamp  string //unique of the operation
 	Index int   //the index of the config
+	Me    string
 
 	Config    shardmaster.Config
 	Datastore map[string]string
+	Logs  	  map[string] string
+	
 }
 
 
@@ -58,6 +61,7 @@ type DisKV struct {
 	config    shardmaster.Config
 	seq       int
 	datastore map[string]string
+	logs 	  map[string] string
 }
 
 //
@@ -154,13 +158,14 @@ func (kv *DisKV) fileReplaceShard(shard int, m map[string]string) {
 func (kv *DisKV) Get(args *GetArgs, reply *GetReply) error {
 	DPrintf("Server: Get operation")
 
-	kv.mu.Lock()
-	defer kv.mu.Unlock()
-
 	if args.Index > kv.config.Num {
 		reply.Err = ErrIndex
 		return nil
 	}
+
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+
 
 	shard := key2shard(args.Key)
 
@@ -173,7 +178,8 @@ func (kv *DisKV) Get(args *GetArgs, reply *GetReply) error {
 		Index: args.Index,
 		Key:   args.Key,
 		Op:    args.Op,
-		UUID:  args.UUID,
+		Timestamp:  args.Timestamp,
+		Me     : args.Me,
 	}
 
 	kv.RequestPaxosToUpdateDB(op)
@@ -192,13 +198,14 @@ func (kv *DisKV) Get(args *GetArgs, reply *GetReply) error {
 // RPC handler for client Put and Append requests
 func (kv *DisKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	DPrintf("Server: Put/Append operation")
-	kv.mu.Lock()
-	defer kv.mu.Unlock()
-
+	
 	if args.Index > kv.config.Num {
 		reply.Err = ErrIndex
 		return nil
 	}
+
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
 
 	shard := key2shard(args.Key)
 
@@ -212,7 +219,8 @@ func (kv *DisKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 		Key:   args.Key,
 		Value: args.Value,
 		Op:    args.Op,
-		UUID:  args.UUID,
+		Timestamp:  args.Timestamp,
+		Me     : args.Me,
 	}
 
 	kv.RequestPaxosToUpdateDB(op)
@@ -242,11 +250,13 @@ func (kv *DisKV) tick() {
 		currentConfig := kv.sm.Query(i)
 
 		new_datastore := map[string]string{}
+		new_logs      := map[string]string{}
 
 		//for each shard in kv
 		for shard, old_gid := range kv.config.Shards {
 			new_gid := currentConfig.Shards[shard]
 			if old_gid != new_gid && new_gid == kv.gid {
+				label := false
 				//get data from all the servers of this group
 				for _, server := range kv.config.Groups[old_gid] {
 
@@ -262,18 +272,30 @@ func (kv *DisKV) tick() {
 						for k, v := range reply.Datastore {
 							new_datastore[k] = v
 						}
+
+						for k, v := range reply.Logs {
+							val, exists := new_logs[k]
+							if !(exists && val >= v) {
+								new_logs[k] = v
+							}
+						}
+						label = true
 					}
+				}
+				if label == false && old_gid > 0 {
+					return
 				}
 			}
 		} //for each shard
 
 		req := Op{
 			Op:   Reconfigure,
-			UUID: nrand(),
-
+			Timestamp: strconv.FormatInt(time.Now().UnixNano(), 10),
+	
 			Index:     i,
 			Config:    currentConfig,
 			Datastore: new_datastore,
+			Logs     : new_logs,
 		}
 		kv.RequestPaxosToUpdateDB(req)
 	} //outer for
@@ -333,6 +355,7 @@ func StartServer(gid int64, shardmasters []string,
 	// Don't call Join().
 	kv.config = shardmaster.Config{Num: -1}
 	kv.datastore = make(map[string]string)
+	kv.logs      = make(map[string]string)
 	kv.seq = 0
 
 	// log.SetOutput(ioutil.Discard)

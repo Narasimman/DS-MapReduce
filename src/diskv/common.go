@@ -35,7 +35,7 @@ type PutAppendArgs struct {
 	// otherwise RPC will break.
 
 	Me    string // client
-	UUID  int64  // uid of the operation
+	Timestamp  string  // timestamp of the operation
 	Index int    // Config number
 }
 
@@ -49,7 +49,7 @@ type GetArgs struct {
 	// You'll have to add definitions here.
 
 	Me    string
-	UUID  int64
+	Timestamp  string
 	Index int
 }
 
@@ -69,5 +69,3 @@ type GetDataReply struct {
 	Datastore map[string]string
 	Logs      map[string]string
 }
-
-

@@ -2,6 +2,7 @@ package diskv
 
 import "time"
 import "paxos"
+import "strconv"
 
 func (kv *DisKV) WaitForAgreement(op Op) Op {
 	kv.seq++
@@ -42,17 +43,24 @@ func (kv *DisKV) RequestPaxosToUpdateDB(op Op) {
 		} else if op.Op == Put || op.Op == Get || op.Op == Append {
 			shard := key2shard(op.Key)
 
+			//avoid any old operation requests 
+			timestamp, exists := kv.logs[op.Me + op.Op]
+			if exists && timestamp >= op.Timestamp {
+				return
+			}
+
 			if !kv.isValidGroup(shard) {
 				DPrintf("paxos group:  ", "wrong group")
 				return
 			}
+			
 		}
 
 		res := kv.WaitForAgreement(op)
 		kv.UpdateDatastore(res)
 		kv.px.Done(kv.seq)
-
-		if res.UUID == op.UUID {
+		DPrintf("Paxos running")
+		if res.Timestamp == op.Timestamp {
 			return
 		}
 	} // infinite for to loop until paxos decides
@@ -65,17 +73,26 @@ The core function to update the data store.
 func (kv *DisKV) UpdateDatastore(op Op) {
 	if op.Op == Put {
 		kv.datastore[op.Key] = op.Value
+		kv.logs[op.Me + op.Op] = op.Timestamp
 	} else if op.Op == Append {
 		value := kv.datastore[op.Key]
 		kv.datastore[op.Key] = value + op.Value
+		kv.logs[op.Me + op.Op] = op.Timestamp
 	} else if op.Op == Reconfigure {
 		DPrintf("Reconfigure in updatedatastore: ", "copying datastore")
 		kv.config = op.Config
 		for k, v := range op.Datastore {
 			kv.datastore[k] = v
 		}
+		
+		for k, v := range op.Logs {
+			val, exists := kv.logs[k]
+			if(!(exists && val >= v)) {
+				kv.logs[k] = v
+			}
+		}
 	} else {
-		DPrintf("Update datastore", "Invalid operation")
+		DPrintf("Update datastore", "GetData Operation. So, nothing to do")
 	}
 	DPrintf("Updating db ", op.Key+" --> "+kv.datastore[op.Key])
 }
@@ -85,24 +102,30 @@ Getting the shard data so that it can be added to the
 current configuration during reconfigure operation
 */
 func (kv *DisKV) GetShardData(args *GetDataArgs, reply *GetDataReply) error {
+	if args.Index > kv.config.Num {
+		reply.Err = ErrIndex
+		return nil
+	}
+
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
+
+	req := Op{
+		Op:   "GetData",
+		Timestamp: strconv.FormatInt(time.Now().UnixNano(), 10),
+	}
+
+	kv.RequestPaxosToUpdateDB(req)
 
 	if args.Index > kv.config.Num {
 		reply.Err = ErrIndex
 		return nil
 	}
 
-	req := Op{
-		Op:   "GetData",
-		UUID: nrand(),
-	}
-
-	kv.RequestPaxosToUpdateDB(req)
-
 	shard := args.Shard
 
 	data := make(map[string]string)
+	logs := make(map[string]string)
 
 	for k, v := range kv.datastore {
 		if key2shard(k) == shard {
@@ -110,8 +133,13 @@ func (kv *DisKV) GetShardData(args *GetDataArgs, reply *GetDataReply) error {
 		}
 	}
 
+	for k,v := range kv.logs {
+		logs[k] = v
+	}
+
 	reply.Err = OK
 	reply.Datastore = data
+	reply.Logs = logs
 
 	return nil
 }
