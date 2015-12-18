@@ -67,13 +67,14 @@ type ShardKV struct {
 func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 	DPrintf("Server: Get operation")
 
-	kv.mu.Lock()
-	defer kv.mu.Unlock()
-
 	if args.Index > kv.config.Num {
 		reply.Err = ErrIndex
 		return nil
 	}
+
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+
 
 	shard := key2shard(args.Key)
 
@@ -106,13 +107,14 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 // RPC handler for client Put and Append requests
 func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	DPrintf("Server: Put/Append operation")
-	kv.mu.Lock()
-	defer kv.mu.Unlock()
-
+	
 	if args.Index > kv.config.Num {
 		reply.Err = ErrIndex
 		return nil
 	}
+
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
 
 	shard := key2shard(args.Key)
 
