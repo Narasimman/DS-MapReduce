@@ -66,6 +66,19 @@ type DisKV struct {
 	
 }
 
+func (kv *DisKV) LocalRestore() {
+	kv.readState()
+	database := kv.readDatabase()
+	logs := kv.readLogs()
+	for k, v := range database {
+		kv.datastore[k] = v
+	}
+	for k, v := range logs{
+		kv.logs[k] = v
+	}
+}
+
+
 //
 // these are handy functions that might be useful
 // for reading and writing key/value files, and
@@ -379,6 +392,11 @@ func StartServer(gid int64, shardmasters []string,
 		log.Fatal("listen error: ", e)
 	}
 	kv.l = l
+
+	if restart {
+		kv.LocalRestore()
+	}
+
 
 	// please do not change any of the following code,
 	// or do anything to subvert it.

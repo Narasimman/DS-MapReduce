@@ -6,10 +6,10 @@ import (
 )
 import "shardmaster"
 import "io/ioutil"
-import "strconv"
+import "log"
 
 import "bytes"
-import "strings"
+
 
 type State struct {
 	config shardmaster.Config
@@ -51,8 +51,8 @@ func (kv *DisKV) stateDirPath()	string {
 	_, err := os.Stat(dir)
 	
 	if err != nil {
-		if err := os.Mkdir(d, 0777); err != nil {
-			log.Fatalf("Mkdir(%v): %v", d, err)
+		if err := os.Mkdir(dir, 0777); err != nil {
+			log.Fatalf("Mkdir(%v): %v", dir, err)
 		}
 	}
 	
@@ -67,7 +67,7 @@ func (kv *DisKV) readState() error {
 		state := kv.decodeState(string(data))
 		kv.config = state.config
 		kv.index  = state.index
-		kv.me     = state.me
+		kv.clientid     = state.me
 		kv.seq    = state.seq	
 	} else {
 		return err
@@ -82,7 +82,7 @@ func (kv *DisKV) writeState() error {
 	state := State {
 		config : kv.config,
 		index  : kv.index,
-		me     : kv.me,
+		me     : kv.clientid,
 		seq    : kv.seq,
 	}
 	
@@ -136,8 +136,8 @@ func (kv *DisKV) logsDirPath()	string {
 	_, err := os.Stat(dir)
 	
 	if err != nil {
-		if err := os.Mkdir(d, 0777); err != nil {
-			log.Fatalf("Mkdir(%v): %v", d, err)
+		if err := os.Mkdir(dir, 0777); err != nil {
+			log.Fatalf("Mkdir(%v): %v", dir, err)
 		}
 	}
 	
@@ -163,12 +163,12 @@ func (kv *DisKV) fileLogPut(key string, content string) error {
 }
 
 
-func (kv *DisKV) readLogs() string[string]string {
+func (kv *DisKV) readLogs() map[string]string {
 	logs := map[string]string{}
 	dir := kv.logsDirPath()
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
-		log.Fatalf("readLogs could not read %v: %v", d, err)
+		log.Fatalf("readLogs could not read %v: %v", dir, err)
 	}
 	for _, fi := range files {
 		n1 := fi.Name()
@@ -188,9 +188,6 @@ func (kv *DisKV) readLogs() string[string]string {
 }
 
 func (kv *DisKV) writeLogs(logs map[string]string) error {
-	tempdir := kv.logsDirPath() + "templogs"
-	dir := kv.logsDirPath() + "logs"
-	
 	for k,v := range logs {
 		for {
 			err := kv.fileLogPut(k, v)
