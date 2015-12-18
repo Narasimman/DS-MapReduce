@@ -17,6 +17,9 @@ import "shardmaster"
 import "io/ioutil"
 import "strconv"
 
+import "bytes"
+import "strings"
+
 
 
 const Debug = 0
@@ -62,7 +65,46 @@ type DisKV struct {
 	seq       int
 	datastore map[string]string
 	logs 	  map[string] string
+	index     int
+	clientid    string
+	
 }
+
+type State struct {
+	config shardmaster.Config
+	seq    int
+	index  int
+	me     string
+}
+
+
+func (kv *DisKV) encodeState(state State) string {
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	
+	enc.Encode(state.config)
+	enc.Encode(state.seq)
+	enc.Encode(state.index)
+	enc.Encode(state.me)
+	
+	return string(buf.Bytes())
+}
+
+func (kv *DisKV) decodeState(buf string) State {
+	reader := bytes.NewBuffer([]byte(buf))
+	dec := gob.NewDecoder(reader)
+	
+	var state State
+	
+	dec.Decode(&state.config)
+	dec.Decode(&state.seq)
+	dec.Decode(&state.index)
+	dec.Decode(&state.me)
+	
+	return state
+} 
+
+
 
 //
 // these are handy functions that might be useful
