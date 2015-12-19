@@ -1,5 +1,6 @@
 package diskv
 
+import "shardmaster"
 //
 // Sharded key/value server.
 // Lots of replica groups, each running op-at-a-time paxos.
@@ -66,6 +67,20 @@ type GetDataArgs struct {
 
 type GetDataReply struct {
 	Err       Err
+	Datastore map[string]string
+	Logs      map[string]string
+}
+
+type GetRemoteDataArgs struct {
+	
+}
+
+type GetRemoteDataReply struct {
+	Err       Err
+	config shardmaster.Config
+	seq    int
+	index  int
+	me     string
 	Datastore map[string]string
 	Logs      map[string]string
 }

@@ -75,8 +75,7 @@ func (kv *ShardKV) UpdateDatastore(op Op) {
 		kv.datastore[op.Key] = op.Value
 		kv.logs[op.Me + op.Op] = op.Timestamp
 	} else if op.Op == Append {
-		value := kv.datastore[op.Key]
-		kv.datastore[op.Key] = value + op.Value
+		kv.datastore[op.Key] += op.Value
 		kv.logs[op.Me + op.Op] = op.Timestamp
 	} else if op.Op == Reconfigure {
 		DPrintf("Reconfigure in updatedatastore: ", "copying datastore")

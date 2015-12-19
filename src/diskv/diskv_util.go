@@ -72,24 +72,42 @@ The core function to update the data store.
 */
 func (kv *DisKV) UpdateDatastore(op Op) {
 	if op.Op == Put {
+		timestamp, exists := kv.logs[op.Me + op.Op]
+		if exists && timestamp >= op.Timestamp {
+			return
+		}
+
+		kv.writeDatabaseLoop(key2shard(op.Key), op.Key, op.Value)
+		kv.writeLogsLoop(op.Me + op.Op, op.Timestamp)
+		
 		kv.datastore[op.Key] = op.Value
 		kv.logs[op.Me + op.Op] = op.Timestamp
 	} else if op.Op == Append {
-		value := kv.datastore[op.Key]
-		kv.datastore[op.Key] = value + op.Value
+		timestamp, exists := kv.logs[op.Me + op.Op]
+		if exists && timestamp >= op.Timestamp {
+			return
+		}
+
+		value := kv.datastore[op.Key] + op.Value
+		
+		kv.writeDatabaseLoop(key2shard(op.Key), op.Key, value)
+		kv.writeLogsLoop(op.Me + op.Op, op.Timestamp)
+		
+		kv.datastore[op.Key] = value
 		kv.logs[op.Me + op.Op] = op.Timestamp
 	} else if op.Op == Reconfigure {
 		DPrintf("Reconfigure in updatedatastore: ", "copying datastore")
 		kv.config = op.Config
+		kv.writeStateLoop()
+		
 		for k, v := range op.Datastore {
+			kv.writeDatabaseLoop(key2shard(k), k, v)
 			kv.datastore[k] = v
 		}
 		
 		for k, v := range op.Logs {
-			val, exists := kv.logs[k]
-			if(!(exists && val >= v)) {
-				kv.logs[k] = v
-			}
+			kv.writeLogsLoop(k, v)
+			kv.logs[k] = v
 		}
 	} else {
 		DPrintf("Update datastore", "GetData Operation. So, nothing to do")
@@ -127,13 +145,16 @@ func (kv *DisKV) GetShardData(args *GetDataArgs, reply *GetDataReply) error {
 	data := make(map[string]string)
 	logs := make(map[string]string)
 
-	for k, v := range kv.datastore {
+	d_datastore := kv.readDatabase()
+	d_logs      := kv.readLogs()
+
+	for k, v := range d_datastore {
 		if key2shard(k) == shard {
 			data[k] = v
 		}
 	}
 
-	for k,v := range kv.logs {
+	for k,v := range d_logs {
 		logs[k] = v
 	}
 
@@ -142,4 +163,20 @@ func (kv *DisKV) GetShardData(args *GetDataArgs, reply *GetDataReply) error {
 	reply.Logs = logs
 
 	return nil
+}
+
+func (kv *DisKV) GetRemoteData(args *GetRemoteDataArgs, reply *GetRemoteDataReply) error {
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+
+	reply.Datastore = kv.datastore
+	reply.Logs      = kv.logs
+	reply.Err       = OK
+	
+	reply.config  = kv.config
+	reply.index   = kv.index
+	reply.me      = kv.clientid
+	reply.seq     = kv.seq
+	
+	return nil 
 }

@@ -199,3 +199,46 @@ func (kv *DisKV) writeLogs(logs map[string]string) error {
 	return nil
 }
 
+func (kv *DisKV) writeLogsLoop(key string, content string) error {
+	for {
+		err := kv.fileLogPut(key, content)
+		if (err == nil) {
+			break
+		}
+	}
+	return nil
+}
+
+func (kv *DisKV) writeDatabaseLoop(shard int, key string, content string) error {
+	for {
+		err := kv.filePut(shard, key, content)
+		if (err == nil) {
+			break
+		}
+	}
+	return nil
+}
+
+func (kv *DisKV) writeStateLoop() error {
+	for {
+		err := kv.writeState()
+		if (err == nil) {
+			break
+		}
+	}
+	return nil
+}
+
+func (kv *DisKV) isLostDisk() bool {
+	dir := kv.dir
+	files, _ := ioutil.ReadDir(dir)
+	
+	DPrintf("", kv.me)
+	DPrintf("lost:", files)
+	
+	if (len(files) == 0) {
+		return true
+	} else {
+		return false
+	}
+}

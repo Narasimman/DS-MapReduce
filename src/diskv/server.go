@@ -63,6 +63,7 @@ type DisKV struct {
 	logs 	  map[string] string
 	index     int
 	clientid    string
+	servers   []string
 	
 }
 
@@ -78,6 +79,45 @@ func (kv *DisKV) LocalRestore() {
 	}
 }
 
+func (kv *DisKV) RemoteRestore() {
+	
+	args := &GetRemoteDataArgs{}
+	reply := &GetRemoteDataReply{}
+
+	num_servers := len(kv.servers)
+
+	datastore := map[string]string{}
+	logs      := map[string]string{}
+	
+	for i := 0; i < num_servers; i++ {
+		srv := kv.servers[i]
+		
+		ok := call(srv, "DisKV.GetRemoteData", args, reply)
+		DPrintf("inside remote loop")
+		if ok && reply.Err == OK {
+			datastore = reply.Datastore
+			logs      = reply.Logs
+			
+
+			for k,v := range datastore {
+				kv.datastore[k] = v
+			}
+			
+			for k,v := range logs {
+				kv.logs[k] = v
+			}
+			
+			kv.config = reply.config
+			kv.seq    = reply.seq
+			kv.index  = reply.index
+			kv.clientid = reply.me
+		}
+	}
+	
+	kv.writeStateLoop()
+	kv.writeDatabase(kv.datastore)
+	kv.writeLogs(kv.logs)
+}
 
 //
 // these are handy functions that might be useful
@@ -182,13 +222,6 @@ func (kv *DisKV) Get(args *GetArgs, reply *GetReply) error {
 	defer kv.mu.Unlock()
 
 
-	shard := key2shard(args.Key)
-
-	if !kv.isValidGroup(shard) {
-		reply.Err = ErrWrongGroup
-		return nil
-	}
-
 	op := Op{
 		Index: args.Index,
 		Key:   args.Key,
@@ -198,6 +231,14 @@ func (kv *DisKV) Get(args *GetArgs, reply *GetReply) error {
 	}
 
 	kv.RequestPaxosToUpdateDB(op)
+	
+	shard := key2shard(args.Key)
+
+	if !kv.isValidGroup(shard) {
+		reply.Err = ErrWrongGroup
+		return nil
+	}
+
 	val, exists := kv.datastore[args.Key]
 
 	if exists == false {
@@ -222,13 +263,6 @@ func (kv *DisKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
-	shard := key2shard(args.Key)
-
-	if !kv.isValidGroup(shard) {
-		reply.Err = ErrWrongGroup
-		return nil
-	}
-
 	op := Op{
 		Index: args.Index,
 		Key:   args.Key,
@@ -239,6 +273,14 @@ func (kv *DisKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	}
 
 	kv.RequestPaxosToUpdateDB(op)
+	
+	shard := key2shard(args.Key)
+
+	if !kv.isValidGroup(shard) {
+		reply.Err = ErrWrongGroup
+		return nil
+	}
+
 	reply.Err = OK
 	return nil
 }
@@ -372,6 +414,7 @@ func StartServer(gid int64, shardmasters []string,
 	kv.datastore = make(map[string]string)
 	kv.logs      = make(map[string]string)
 	kv.seq = 0
+	kv.servers = servers
 
 	// log.SetOutput(ioutil.Discard)
 
@@ -384,8 +427,6 @@ func StartServer(gid int64, shardmasters []string,
 
 	// log.SetOutput(os.Stdout)
 
-
-
 	os.Remove(servers[me])
 	l, e := net.Listen("unix", servers[me])
 	if e != nil {
@@ -393,8 +434,13 @@ func StartServer(gid int64, shardmasters []string,
 	}
 	kv.l = l
 
-	if restart {
+	if restart && false == kv.isLostDisk() {
+		DPrintf("Server has restarted. So, first get the data from the disk")
 		kv.LocalRestore()
+	} else if restart && true == kv.isLostDisk() {
+		DPrintf("SERVER restarted and lost disk")
+		DPrintf("Which server", kv.me)
+		//kv.RemoteRestore()
 	}
 
 

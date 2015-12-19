@@ -75,14 +75,6 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
-
-	shard := key2shard(args.Key)
-
-	if !kv.isValidGroup(shard) {
-		reply.Err = ErrWrongGroup
-		return nil
-	}
-
 	op := Op{
 		Index: args.Index,
 		Key:   args.Key,
@@ -92,6 +84,14 @@ func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) error {
 	}
 
 	kv.RequestPaxosToUpdateDB(op)
+
+	shard := key2shard(args.Key)
+
+	if !kv.isValidGroup(shard) {
+		reply.Err = ErrWrongGroup
+		return nil
+	}
+
 	val, exists := kv.datastore[args.Key]
 
 	if exists == false {
@@ -116,13 +116,6 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
-	shard := key2shard(args.Key)
-
-	if !kv.isValidGroup(shard) {
-		reply.Err = ErrWrongGroup
-		return nil
-	}
-
 	op := Op{
 		Index: args.Index,
 		Key:   args.Key,
@@ -133,6 +126,14 @@ func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) error {
 	}
 
 	kv.RequestPaxosToUpdateDB(op)
+	
+	shard := key2shard(args.Key)
+
+	if !kv.isValidGroup(shard) {
+		reply.Err = ErrWrongGroup
+		return nil
+	}
+
 	reply.Err = OK
 	return nil
 }
